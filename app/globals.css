@@ -12,6 +12,15 @@
   --vodafone-dark-red: #bd0000;
   --vodafone-grey: #4a4d4e;
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.14);
+  --tobi-font-title: 18px;
+  --tobi-font-message: 15px;
+  --tobi-font-card-title: 15px;
+  --tobi-font-action: 14px;
+  --tobi-font-meta: 12px;
+  --tobi-line-message: 22px;
+  --tobi-radius-card: 16px;
+  --tobi-radius-bubble: 16px;
+  --tobi-space-section: 20px;
 }
 
 * { box-sizing: border-box; }
@@ -23,7 +32,9 @@ body {
   font-family: "Aptos", "Segoe UI", Arial, sans-serif;
   font-synthesis: none;
 }
-button, textarea, input { font: inherit; }
+@layer base {
+  button, textarea, input { font-family: inherit; }
+}
 button { -webkit-tap-highlight-color: transparent; }
 ::selection { background: #ffe0e0; color: var(--ink); }
 

@@ -1,3 +1,5 @@
+import type { MediaCard } from "@/lib/tobi-config";
+
 export type KnowledgeCard = {
   id: string;
   label: string;
@@ -11,34 +13,89 @@ export type KnowledgeCard = {
   actionLabel?: string;
   actionUrl?: string;
   warning?: string;
+  mediaCards?: MediaCard[];
 };
 
 export const vodafoneKnowledge: KnowledgeCard[] = [
   {
-    id: "internet",
-    label: "Potíže s pevným internetem",
-    shortLabel: "Internet nefunguje",
-    triggers: ["internet nefunguje", "nejde internet", "nejde wifi", "wi-fi nefunguje", "výpadek internetu", "nejde net", "pomalý internet"],
-    answer: "Pomůžu vám zjistit, proč pevný internet nefunguje. Začněme nejrychlejšími kontrolami — bez resetu do továrního nastavení.",
+    id: "internet-no-outage",
+    label: "Internet nefunguje bez hlášeného výpadku",
+    shortLabel: "Zkuste restartovat modem",
+    triggers: ["výpadek na adrese není hlášený", "výpadek není hlášený"],
+    answer: "Pokračujte kontrolou napájení a restartem modemu.",
     steps: [
-      "Ověřte výpadek na své adrese.",
-      "Zkontrolujte napájení a oba konce kabelů.",
-      "Odpojte modem na 30 sekund a po zapojení několik minut počkejte.",
-      "Vyzkoušejte připojení na jiném zařízení.",
+      "Odpojte modem ze zásuvky na přibližně 1 minutu.",
+      "Modem znovu zapojte.",
+      "Po zapojení počkejte přibližně 5 minut.",
     ],
     sourceTitle: "Vodafone Centrum péče · Pevný internet",
     sourceUrl: "https://www.vodafone.cz/pece/reseni-technickych-problemu/nemuzu-datovat/nefunguje-pripojeni-k-internetu/",
-    quickReplies: ["Zkontrolovat výpadek", "Modem stále bliká", "Spojit s člověkem"],
-    actionLabel: "Ověřit výpadek",
-    actionUrl: "https://www.vodafone.cz/vypadky/",
-    warning: "Tovární reset nechte až jako poslední krok — smaže vlastní nastavení Wi‑Fi.",
+    quickReplies: ["Už to funguje", "Stále nefunguje"],
+  },
+  {
+    id: "internet-after-restart",
+    label: "Internet nefunguje po restartu modemu",
+    shortLabel: "Zkontrolujte kabely a zařízení",
+    triggers: ["stále nefunguje ani po restartu modemu", "stále nefunguje. potřebuji pokračovat v diagnostice"],
+    answer: "Pokračujme kontrolou kabelů a ověřením na jiném zařízení.",
+    steps: [
+      "Zkontrolujte oba konce napájecího a datového kabelu.",
+      "Vyzkoušejte internet na jiném zařízení.",
+      "Poznamenejte si, které kontrolky na modemu svítí nebo blikají.",
+    ],
+    sourceTitle: "Vodafone Centrum péče · Pevný internet",
+    sourceUrl: "https://www.vodafone.cz/pece/reseni-technickych-problemu/nemuzu-datovat/nefunguje-pripojeni-k-internetu/",
+    quickReplies: ["Internet nejde na žádném zařízení", "Funguje na jiném zařízení"],
+  },
+  {
+    id: "internet",
+    label: "Potíže s pevným internetem",
+    shortLabel: "Zkuste tyto kroky",
+    triggers: ["nefunguje mi internet doma", "internet nefunguje", "nefunguje mi pevný internet", "nefunguje mi domácí internet", "nejde internet", "nejde wifi", "wi-fi nefunguje", "výpadek internetu", "nejde net", "pomalý internet"],
+    answer: "Pojďme to spolu vyřešit. Zkuste tyto kroky:",
+    steps: [
+      "Ověřte výpadek na své adrese.",
+      "Zkontrolujte napájení a oba konce kabelů.",
+      "Odpojte modem na 1 minutu. Po zapojení počkejte 5 minut.",
+    ],
+    sourceTitle: "Vodafone Centrum péče · Pevný internet",
+    sourceUrl: "https://www.vodafone.cz/pece/reseni-technickych-problemu/nemuzu-datovat/nefunguje-pripojeni-k-internetu/",
+    quickReplies: ["Ano, funguje", "Ne, stále nefunguje"],
+    mediaCards: [
+      {
+        id: "outage",
+        title: "Ověření výpadku",
+        description: "Zjistěte, zda je u vás hlášený výpadek.",
+        image: "/tobi/internet-outage.svg",
+        imageAlt: "Dům se symbolem internetového signálu",
+        actionLabel: "Ověřit výpadek",
+        actionUrl: "https://www.vodafone.cz/vypadky/",
+        external: true,
+      },
+      {
+        id: "connection",
+        title: "Kontrola připojení",
+        description: "Ověřte napájení a správné zapojení kabelů.",
+        image: "/tobi/modem-connected.svg",
+        imageAlt: "Modem se zapojenými kabely",
+        external: false,
+      },
+      {
+        id: "restart",
+        title: "Restart modemu",
+        description: "Odpojte modem na 1 minutu. Po zapojení počkejte 5 minut.",
+        image: "/tobi/modem-restart.svg",
+        imageAlt: "Modem a kruhová šipka s údajem 1 minuta",
+        external: false,
+      },
+    ],
   },
   {
     id: "esim",
     label: "Aktivace nebo přesun eSIM",
     shortLabel: "eSIM a SIM",
     triggers: ["esim", "e-sim", "aktivace sim", "přenést sim", "přesun sim", "vyměnit sim"],
-    answer: "Rozumím — řešíte eSIM. Nejdřív potřebuji rozlišit, jestli ji aktivujete poprvé, nebo ji přesouváte do nového telefonu.",
+    answer: "Nejdřív vyberte, jestli eSIM aktivujete poprvé, nebo ji přesouváte do nového telefonu.",
     steps: [
       "Připojte telefon k internetu, ideálně přes Wi‑Fi.",
       "Nahrajte eSIM naskenováním QR kódu nebo přes přenos eSIM v telefonu.",
@@ -57,7 +114,7 @@ export const vodafoneKnowledge: KnowledgeCard[] = [
     label: "Vyúčtování a platby",
     shortLabel: "Vyúčtování",
     triggers: ["vyúčtování", "faktura", "zaplatit vyúčtování", "platba faktury", "inkaso", "dlužná částka", "uctovani"],
-    answer: "Pomůžu s vyúčtováním. Nejrychleji ho zobrazíte a zaplatíte v Můj Vodafone nebo v aplikaci Můj Vodafone+.",
+    answer: "Vyúčtování zobrazíte a zaplatíte v Můj Vodafone nebo v aplikaci Můj Vodafone+.",
     steps: [
       "Otevřete sekci Vyúčtování v Můj Vodafone.",
       "Vyberte správného plátce, pokud jich máte více.",
@@ -74,7 +131,7 @@ export const vodafoneKnowledge: KnowledgeCard[] = [
     label: "Roaming a služby v zahraničí",
     shortLabel: "Roaming",
     triggers: ["roaming", "data v zahraničí", "volání v zahraničí", "roamingová zóna"],
-    answer: "Jasně — podíváme se na roaming. Cena i dostupný objem dat závisí na zemi, roamingové zóně a vašem tarifu.",
+    answer: "Cena i dostupný objem dat závisí na zemi, roamingové zóně a vašem tarifu.",
     steps: [
       "Zkontrolujte cílovou zemi a její roamingovou zónu.",
       "V Můj Vodafone otevřete Čerpání a ověřte dostupná data pro Zónu 1.",
@@ -92,7 +149,7 @@ export const vodafoneKnowledge: KnowledgeCard[] = [
     label: "PIN, PUK a zablokovaná SIM",
     shortLabel: "PIN a PUK",
     triggers: ["pin", "puk", "zablokovaná sim", "bloklá sim", "odblokovat sim", "zapomenutý pin", "kód sim"],
-    answer: "Pomůžu vám najít PUK nebo odblokovat SIM. Kvůli bezpečnosti sem PIN ani PUK neposílejte.",
+    answer: "PUK najdete v samoobsluze. Kvůli bezpečnosti sem PIN ani PUK neposílejte.",
     steps: [
       "V Můj Vodafone otevřete Služby → Moje SIM / eSIM.",
       "PUK najdete také v aplikaci Můj Vodafone+ v Účet → SIM & eSIM.",
@@ -110,7 +167,7 @@ export const vodafoneKnowledge: KnowledgeCard[] = [
     label: "Signál, volání a SMS",
     shortLabel: "Signál a volání",
     triggers: ["nejde volat", "nemůžu volat", "bez signálu", "nemám signál", "potíže se signálem", "výpadek signálu"],
-    answer: "Rozumím — řešíte signál nebo volání. Ověříme, jestli je příčina v síti, SIM, nebo telefonu.",
+    answer: "Nejdřív ověříme, jestli je příčina v síti, SIM, nebo telefonu.",
     steps: [
       "Vypněte a znovu zapněte telefon.",
       "Ověřte pokrytí a případný výpadek ve své lokalitě.",
@@ -118,7 +175,7 @@ export const vodafoneKnowledge: KnowledgeCard[] = [
     ],
     sourceTitle: "Vodafone Centrum péče · Potíže se signálem",
     sourceUrl: "https://www.vodafone.cz/pece/reseni-technickych-problemu/nemuzu-volat/potize-se-signalem/",
-    quickReplies: ["Ověřit pokrytí", "Jen mobilní data", "Spojit s člověkem"],
+    quickReplies: ["Ověřit pokrytí", "Jen mobilní data"],
     actionLabel: "Otevřít mapu pokrytí",
     actionUrl: "https://www.vodafone.cz/mapa-pokryti/",
   },

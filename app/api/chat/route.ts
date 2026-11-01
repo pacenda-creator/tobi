@@ -9,10 +9,16 @@ type TobiEnv = Cloudflare.Env & {
 type IncomingMessage = { role: "assistant" | "user"; content: string };
 
 const instructionsByTone = {
-  friendly: "Mluv lidsky, klidně a stručně. Emoji používej jen u neutrálních témat a maximálně jedno.",
+  friendly: "Mluv lidsky, klidně a stručně. Bez úvodních frází a bez emoji.",
   brief: "Odpovídej velmi stručně, maximálně ve třech větách.",
   formal: "Mluv zdvořile, profesionálně a bez emoji.",
 };
+
+function conciseSnippet(snippet: string) {
+  const clean = snippet.replace(/\s+/g, " ").trim();
+  const sentences = clean.match(/[^.!?]+[.!?]+/g)?.slice(0, 2).join(" ").trim() || clean;
+  return sentences.length > 280 ? `${sentences.slice(0, 277).trimEnd()}…` : sentences;
+}
 
 function extractOutputText(payload: unknown) {
   if (!payload || typeof payload !== "object") return null;
@@ -35,7 +41,7 @@ function responseMeta(lastMessage: string, retrieved: SearchResult[]) {
       const primary = retrieved[0];
       return {
         intent: { id: "retrieved", label: primary.title, confidence: Math.min(0.91, 0.64 + primary.score / 150) },
-        quickReplies: ["Další podrobnosti", "Související témata", "Spojit s člověkem"],
+        quickReplies: [],
         source: { title: primary.title, url: primary.url, checked: "30. 10. 2026" },
         sources: retrieved.slice(0, 3).map((result) => ({
           title: result.title,
@@ -64,6 +70,7 @@ function responseMeta(lastMessage: string, retrieved: SearchResult[]) {
       warning: knowledge.warning,
       actionLabel: knowledge.actionLabel,
       actionUrl: knowledge.actionUrl,
+      mediaCards: knowledge.mediaCards,
     },
   };
 }
@@ -93,13 +100,19 @@ export async function POST(request: Request) {
   const knowledge = findKnowledge(lastMessage);
   const runtime = process.env as TobiEnv;
 
+  // Referenční scénář je záměrně deterministický: copy a kroky jsou součástí UX akceptace.
+  if (knowledge?.id === "internet") {
+    await new Promise((resolve) => setTimeout(resolve, 320));
+    return Response.json({ mode: "mock", reply: knowledge.answer, ...meta });
+  }
+
   if (!runtime.OPENAI_API_KEY) {
     await new Promise((resolve) => setTimeout(resolve, 520));
     return Response.json({
       mode: "mock",
       reply: knowledge?.answer
         || (retrieved.length
-          ? `Na Vodafone.cz jsem našel odpovídající téma „${retrieved[0].title}“. ${retrieved[0].snippet}`
+          ? conciseSnippet(retrieved[0].snippet)
           : "Chci si být jistý, že vám poradím správně. Zkuste prosím doplnit službu nebo zařízení, kterého se dotaz týká."),
       ...meta,
     });
@@ -114,9 +127,9 @@ export async function POST(request: Request) {
     },
     body: JSON.stringify({
       model: runtime.OPENAI_MODEL || "gpt-6-astra",
-      instructions: `Jsi TOBi, AI asistent Vodafonu v českém prototypu. Vždy se označuj jako AI. Nejprve jednou větou potvrď záměr zákazníka. Odpovídej pouze z dohledaných zdrojů níže; pokud podklad nestačí, přiznej nejistotu a nabídni odkaz na Centrum péče nebo předání člověku. Nikdy nevymýšlej stav účtu, služby, cenu ani výpadek. Nikdy nežádej PIN, PUK, heslo, celé číslo karty ani QR kód eSIM. Jedna odpověď má řešit jeden krok. ${instructionsByTone[tone]}\n\nDOHLEDANÉ ZDROJE Z VODAFONE.CZ:\n${formatRetrievedContext(retrieved) || "Pro tento dotaz nebyl nalezen dostatečně relevantní veřejný zdroj."}`,
+      instructions: `Jsi TOBi, AI asistent Vodafonu v českém prototypu. Odpověz rovnou na dotaz; nepiš „Rozumím“, „Jasně“, „Na Vodafone.cz jsem našel“ ani podobný úvod. Potvrzení záměru použij jen tehdy, když je dotaz nejasný nebo by chybný výklad mohl zákazníkovi uškodit. Odpovídej pouze z dohledaných zdrojů níže; pokud podklad nestačí, přiznej nejistotu a polož jednu konkrétní doplňující otázku. Nikdy nevymýšlej stav účtu, služby, cenu ani výpadek. Nikdy nežádej PIN, PUK, heslo, celé číslo karty ani QR kód eSIM. Dej jeden další krok, nejvýše tři krátké věty. ${instructionsByTone[tone]}\n\nDOHLEDANÉ ZDROJE Z VODAFONE.CZ:\n${formatRetrievedContext(retrieved) || "Pro tento dotaz nebyl nalezen dostatečně relevantní veřejný zdroj."}`,
       input: messages.map((message) => ({ role: message.role, content: message.content })),
-      max_output_tokens: 350,
+      max_output_tokens: 220,
     }),
   });
 
