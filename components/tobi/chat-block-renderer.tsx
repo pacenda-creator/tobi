@@ -72,7 +72,7 @@ export const CHAT_BLOCK_RENDERER_REGISTRY = {
     : null) satisfies BlockRenderer,
 
   mediaCards: ((block, context) => block.type === "mediaCards"
-    ? <div className="mt-3"><MediaCarousel
+    ? <div className="mt-2"><MediaCarousel
         cards={block.cards.map((card) => ({
           id: card.id,
           title: card.title,

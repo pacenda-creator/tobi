@@ -18,27 +18,31 @@ type MediaCarouselProps = {
   onSendMessage?: (message: string, label: string) => void;
 };
 
-function Card({ card, step, busy = false, onSendMessage }: { card: CarouselMediaCard; step: number; busy?: boolean; onSendMessage?: (message: string, label: string) => void }) {
+function Card({ card, step, compact = false, busy = false, onSendMessage }: { card: CarouselMediaCard; step: number; compact?: boolean; busy?: boolean; onSendMessage?: (message: string, label: string) => void }) {
   const [imageFailed, setImageFailed] = useState(false);
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#dddddd] bg-white shadow-[0_2px_8px_rgba(0,0,0,.04)]">
-      <div className="relative h-24 bg-[#f7f7f7]">
-        {imageFailed ? (
-          <div role="img" aria-label={card.imageAlt} className="grid h-full place-items-center text-[#777]"><ImageOff className="h-8 w-8" aria-hidden="true" /></div>
-        ) : (
-          <Image src={card.image} alt={card.imageAlt} fill sizes="(max-width: 519px) 84vw, 320px" style={{ objectFit: "contain" }} onError={() => setImageFailed(true)} />
-        )}
-      </div>
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <span className="text-xs font-bold text-[#777]">Krok {step}</span>
-        <h3 className="text-[15px] font-bold leading-5 text-[#222]">{card.title}</h3>
+      <div className={`flex flex-1 flex-col gap-2 ${compact ? "p-3" : "p-4"}`}>
+        <div className="flex items-center gap-3">
+          <div className={`relative shrink-0 rounded-xl bg-[#f7f7f7] ${compact ? "h-10 w-10" : "h-12 w-12"}`}>
+            {imageFailed ? (
+              <div role="img" aria-label={card.imageAlt} className="grid h-full place-items-center text-[#777]"><ImageOff className="h-5 w-5" aria-hidden="true" /></div>
+            ) : (
+              <Image src={card.image} alt={card.imageAlt} fill sizes={compact ? "40px" : "48px"} style={{ objectFit: "contain" }} onError={() => setImageFailed(true)} />
+            )}
+          </div>
+          <div className="min-w-0">
+            <span className="text-xs font-bold leading-4 text-[#777]">Krok {step}</span>
+            <h3 className="mt-0.5 text-[15px] font-bold leading-5 text-[#222]">{card.title}</h3>
+          </div>
+        </div>
         <p className="text-sm leading-5 text-[#555]">{card.description}</p>
         {card.actionLabel && card.actionUrl ? (
           <a
             href={card.actionUrl}
             target={card.external ? "_blank" : undefined}
             rel={card.external ? "noreferrer" : undefined}
-            className="mt-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#222] px-4 py-2 text-center text-sm font-bold text-[#222] transition hover:bg-[#f3f3f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]"
+            className="mt-auto inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#222] px-4 py-2 text-center text-sm font-bold text-[#222] transition hover:bg-[#f3f3f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]"
             aria-label={card.external ? `${card.actionLabel}, otevře se na externím webu` : card.actionLabel}
           >
             {card.actionLabel}
@@ -49,7 +53,7 @@ function Card({ card, step, busy = false, onSendMessage }: { card: CarouselMedia
             type="button"
             disabled={busy}
             onClick={() => onSendMessage?.(card.actionMessage!, card.actionLabel!)}
-            className="mt-auto inline-flex min-h-11 items-center justify-center rounded-full border border-[#222] px-4 py-2 text-center text-sm font-bold text-[#222] transition hover:bg-[#f3f3f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000] disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-auto inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#222] px-4 py-2 text-center text-sm font-bold text-[#222] transition hover:bg-[#f3f3f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {card.actionLabel}
           </button>
@@ -111,6 +115,20 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520,
 
   return (
     <section ref={containerRef} className="@container" aria-label="Doporučený postup">
+      {cards.length > 1 ? <div className="sticky top-0 z-10 mb-2 flex min-h-11 items-center justify-between gap-3 bg-white" aria-label="Navigace doporučeného postupu">
+        <button type="button" onClick={() => emblaApi?.scrollPrev(window.matchMedia("(prefers-reduced-motion: reduce)").matches)} disabled={!canPrev} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#cccccc] bg-white text-[#222] transition hover:border-[#999] hover:bg-[#fafafa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000] disabled:opacity-35" aria-label="Předchozí karta">
+          <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+        </button>
+        <div className="min-w-0 text-center">
+          <span className="text-xs font-bold text-[#555]" aria-live="polite">{positionLabel}</span>
+          <div className="mt-1 flex justify-center gap-1.5" aria-hidden="true">
+            {cards.map((card, index) => <span key={card.id} className={`h-1.5 rounded-full transition-all ${index >= visibleStart && index <= visibleEnd ? "w-4 bg-[#e60000]" : "w-1.5 bg-[#c8c8c8]"}`} />)}
+          </div>
+        </div>
+        <button type="button" onClick={() => emblaApi?.scrollNext(window.matchMedia("(prefers-reduced-motion: reduce)").matches)} disabled={!canNext} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#cccccc] bg-white text-[#222] transition hover:border-[#999] hover:bg-[#fafafa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000] disabled:opacity-35" aria-label="Další karta">
+          <ChevronRight className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div> : null}
       <div
         ref={viewportRef}
         className="overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]"
@@ -127,30 +145,17 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520,
             <div
               key={card.id}
               className="min-w-0 shrink-0"
-              style={{ flexBasis: isWide ? "calc(50% - 6px)" : "calc(100% - 32px)" }}
+              style={{ flexBasis: isWide ? "calc(50% - 6px)" : "100%" }}
               role="group"
               aria-label={`${index + 1} z ${cards.length}`}
+              aria-hidden={index < visibleStart || index > visibleEnd}
+              inert={index < visibleStart || index > visibleEnd}
             >
-              <Card card={card} step={index + 1} busy={busy} onSendMessage={onSendMessage} />
+              <Card card={card} step={index + 1} compact={!isWide} busy={busy} onSendMessage={onSendMessage} />
             </div>
           ))}
         </div>
       </div>
-
-      {cards.length > 1 ? <div className="mt-3 flex items-center justify-between gap-3">
-        <button type="button" onClick={() => emblaApi?.scrollPrev(window.matchMedia("(prefers-reduced-motion: reduce)").matches)} disabled={!canPrev} className="grid h-11 w-11 place-items-center rounded-full border border-[#cccccc] text-[#222] disabled:opacity-35" aria-label="Předchozí karty">
-          <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-        </button>
-        <div className="flex min-w-0 flex-col items-center gap-1">
-          <span className="sr-only" aria-live="polite">{positionLabel}</span>
-          <div className="flex gap-1.5" aria-hidden="true">
-            {cards.map((card, index) => <span key={card.id} className={`h-1.5 rounded-full transition-all ${index >= visibleStart && index <= visibleEnd ? "w-4 bg-[#e60000]" : "w-1.5 bg-[#c8c8c8]"}`} />)}
-          </div>
-        </div>
-        <button type="button" onClick={() => emblaApi?.scrollNext(window.matchMedia("(prefers-reduced-motion: reduce)").matches)} disabled={!canNext} className="grid h-11 w-11 place-items-center rounded-full border border-[#cccccc] text-[#222] disabled:opacity-35" aria-label="Další karty">
-          <ChevronRight className="h-5 w-5" aria-hidden="true" />
-        </button>
-      </div> : null}
     </section>
   );
 }
