@@ -521,7 +521,7 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
 
               <div className="relative min-h-0 flex-1">
                 <div aria-live="polite" className="sr-only">{!busy && messages.at(-1)?.role === "assistant" ? messages.at(-1)?.text : ""}</div>
-                <div ref={chatScrollRef} onScroll={handleChatScroll} className={`chat-scrollbar h-full overflow-y-auto bg-white ${customerOnly ? "space-y-5 px-4 py-5 min-[480px]:space-y-4 min-[480px]:py-4" : "space-y-5 px-4 py-5 sm:px-5"}`}>
+                <div ref={chatScrollRef} onScroll={handleChatScroll} className={`chat-scrollbar h-full overflow-y-auto bg-white ${customerOnly ? "space-y-5 px-4 py-5 md:space-y-3 md:py-3" : "space-y-5 px-4 py-5 sm:px-5"}`}>
                   {messages.map((message, index) => {
                     const response = message.response;
                     const hasStructuredContent = response?.blocks.some((block) => block.type !== "sourceList") || false;
@@ -538,10 +538,10 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
                         </div>
                       ) : (
                         <>
-                          {!(index === 0 && messages.length === 1 && showMajorIncident) ? index === 0 && messages.length === 1 ? <h2 className="max-w-[65ch] text-xl font-bold leading-[26px] text-[#222] sm:text-[22px] sm:leading-7">{message.text}</h2> : <p className={`text-[length:var(--tobi-font-message)] leading-[var(--tobi-line-message)] text-[#333] ${hasStructuredContent ? "max-w-[65ch]" : "rounded-[var(--tobi-radius-bubble)] border border-[#e5e5e5] bg-[#fafafa] px-4 py-3"}`}>{message.text}</p> : null}
+                          {!(index === 0 && messages.length === 1 && showMajorIncident) ? index === 0 && messages.length === 1 ? <h2 className="max-w-[65ch] text-xl font-bold leading-[26px] text-[#222]">{message.text}</h2> : <p className={`text-[length:var(--tobi-font-message)] leading-[var(--tobi-line-message)] text-[#333] ${hasStructuredContent ? "max-w-[65ch]" : "rounded-[var(--tobi-radius-bubble)] border border-[#e5e5e5] bg-[#fafafa] px-4 py-3"}`}>{message.text}</p> : null}
                           {config.features.timestamps ? <span className="mt-1 block text-[10px] text-[#999]">{message.time}</span> : null}
 
-                          {index === 0 && messages.length === 1 && (showMajorIncident && incident ? <div className="mt-1"><IncidentCard incident={incident} onOtherTopic={() => setIncidentDismissed(true)} /></div> : <div className="mt-3">{config.presentation.intro.renderMode === "carousel" ? <CapabilityCarousel items={config.introUseCases} onSelect={selectIntroTopic} wideBreakpoint={config.presentation.carousel.wideBreakpoint} /> : <IntroTopics items={config.introUseCases} initialVisibleCount={config.presentation.intro.initialVisibleCount} onSelect={selectIntroTopic} />}<p className="mt-3 text-sm leading-5 text-[#666]">Nebo mi napište vlastní dotaz.</p></div>)}
+                          {index === 0 && messages.length === 1 && (showMajorIncident && incident ? <div className="mt-1"><IncidentCard incident={incident} onOtherTopic={() => setIncidentDismissed(true)} /></div> : <div className="mt-3 md:mt-2">{config.presentation.intro.renderMode === "carousel" ? <CapabilityCarousel items={config.introUseCases} onSelect={selectIntroTopic} wideBreakpoint={config.presentation.carousel.wideBreakpoint} /> : <IntroTopics items={config.introUseCases} initialVisibleCount={config.presentation.intro.initialVisibleCount} onSelect={selectIntroTopic} />}<p className="mt-3 text-sm leading-5 text-[#666] md:mt-2">Nebo mi napište vlastní dotaz.</p></div>)}
 
                           {response ? <ChatBlockRenderer
                             response={response}
