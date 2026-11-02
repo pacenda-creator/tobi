@@ -3,7 +3,6 @@
 import {
   BookOpenCheck,
   Check,
-  ChevronDown,
   ChevronRight,
   CircleHelp,
   Database,
@@ -12,7 +11,9 @@ import {
   Globe2,
   Headphones,
   LockKeyhole,
+  Maximize2,
   Menu,
+  Minimize2,
   MoreHorizontal,
   QrCode,
   RefreshCw,
@@ -29,35 +30,23 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { MediaCarousel } from "@/components/tobi/media-carousel";
+import { ChatBlockRenderer } from "@/components/tobi/chat-block-renderer";
 import { CapabilityCarousel } from "@/components/tobi/capability-carousel";
 import { IncidentCard } from "@/components/tobi/incident-card";
-import { defaultDemoRuntimeState, defaultTobiConfig, demoMajorIncident, type MediaCard, type OperatorAvailability } from "@/lib/tobi-config";
+import { IntroTopics } from "@/components/tobi/intro-topics";
+import { chatRequestV1Schema, chatResponseV1Schema, salvageChatResponseTextV1, type ChatRequestV1, type ChatResponseV1, type QuickReplyV1 } from "@/lib/contracts/chat/v1";
+import { defaultDemoRuntimeState, defaultTobiConfig, demoMajorIncident, type OperatorAvailability } from "@/lib/tobi-config";
 
-type Tone = "friendly" | "brief" | "formal";
-type Intent = { id: string; label: string; confidence: number };
-type Source = { title: string; url: string; checked: string };
-type AnswerCard = {
-  title: string;
-  steps: string[];
-  warning?: string;
-  actionLabel?: string;
-  actionUrl?: string;
-  mediaCards?: MediaCard[];
-};
+type Tone = NonNullable<ChatRequestV1["preferences"]>["tone"];
 type Message = {
   id: string;
   role: "assistant" | "user";
   text: string;
   requestText?: string;
   time: string;
-  intent?: Intent;
-  source?: Source | null;
-  sources?: Source[];
-  card?: AnswerCard | null;
-  quickReplies?: string[];
+  response?: ChatResponseV1;
   feedback?: "up" | "down";
 };
 type PrototypeAnalyticsEvent = { type: "task_resolution" | "answer_helpfulness"; value: "yes" | "no"; at: string };
@@ -66,6 +55,10 @@ const topicIcons = { router: Router, "qr-code": QrCode, "wallet-cards": WalletCa
 
 function timeNow() {
   return new Intl.DateTimeFormat("cs-CZ", { hour: "2-digit", minute: "2-digit" }).format(new Date());
+}
+
+function uniqueId(prefix: string) {
+  return `${prefix}-${crypto.randomUUID()}`;
 }
 
 function initialMessage(): Message {
@@ -85,6 +78,23 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () =
   );
 }
 
+function CustomerPagePreview({ chatOpen }: { chatOpen: boolean }) {
+  return (
+    <div data-chat-open={chatOpen} className="tobi-customer-background min-h-[100dvh] bg-[#f7f7f7] text-[#222]">
+      <header className="border-b border-[#dedede] bg-white px-5 py-4 sm:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#e60000] text-lg font-black text-white">“</span><span className="font-bold">Vodafone</span></div>
+          <nav className="hidden items-center gap-6 text-sm font-semibold text-[#555] sm:flex" aria-label="Ukázková navigace"><a href="#sluzby" className="hover:text-[#bd0000]">Služby</a><a href="#pece" className="hover:text-[#bd0000]">Péče</a><a href="#ucet" className="hover:text-[#bd0000]">Můj Vodafone</a></nav>
+        </div>
+      </header>
+      <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[1.35fr_.65fr] lg:py-16">
+        <section id="pece" className="rounded-[28px] bg-white p-7 shadow-sm sm:p-10"><p className="text-sm font-bold text-[#bd0000]">Centrum péče</p><h1 className="mt-3 max-w-xl text-3xl font-extrabold tracking-[-.04em] sm:text-5xl">S čím vám dnes můžeme pomoci?</h1><p className="mt-5 max-w-2xl text-base leading-7 text-[#666]">Najděte rychle odpověď, spravujte své služby nebo se zeptejte TOBiho. Obsah stránky zůstává dostupný i při otevřeném chatu.</p><div className="mt-7 flex flex-wrap gap-3"><a href="#sluzby" className="inline-flex min-h-11 items-center rounded-full bg-[#e60000] px-5 text-sm font-bold text-white hover:bg-[#bd0000]">Spravovat služby</a><a href="#napoveda" className="inline-flex min-h-11 items-center rounded-full border border-[#ccc] px-5 text-sm font-bold hover:bg-[#f5f5f5]">Projít nápovědu</a></div></section>
+        <aside id="sluzby" className="grid content-start gap-3"><div className="rounded-2xl border border-[#e2e2e2] bg-white p-5"><p className="text-sm font-bold">Internet a Wi‑Fi</p><p className="mt-1 text-sm leading-5 text-[#666]">Nastavení, výpadky a rychlost připojení.</p></div><div className="rounded-2xl border border-[#e2e2e2] bg-white p-5"><p className="text-sm font-bold">Vyúčtování</p><p className="mt-1 text-sm leading-5 text-[#666]">Platby, faktury a vysvětlení částek.</p></div></aside>
+      </div>
+    </div>
+  );
+}
+
 export default function TobiStudio({ customerOnly = false }: { customerOnly?: boolean }) {
   const [config, setConfig] = useState(defaultTobiConfig);
   const [runtime, setRuntime] = useState(defaultDemoRuntimeState);
@@ -94,11 +104,12 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
   const [tone, setTone] = useState<Tone>("friendly");
   const [operatorPanelOpen, setOperatorPanelOpen] = useState(false);
   const [chatClosed, setChatClosed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [incidentDismissed, setIncidentDismissed] = useState(false);
   const [incidentClock, setIncidentClock] = useState(() => Date.now());
   const [analyticsEvents, setAnalyticsEvents] = useState<PrototypeAnalyticsEvent[]>([]);
   const [hasNewResponse, setHasNewResponse] = useState(false);
-  const [lastFailedRequest, setLastFailedRequest] = useState<{ text: string; baseMessages: Message[] } | null>(null);
+  const [lastFailedRequest, setLastFailedRequest] = useState<{ text: string; baseMessages: Message[]; displayText?: string } | null>(null);
   const [mode, setMode] = useState<"mock" | "openai">("mock");
   const [model, setModel] = useState("mock scénář");
   const [knowledgeCount, setKnowledgeCount] = useState(887);
@@ -106,6 +117,7 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
   const [desktopPreview, setDesktopPreview] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
+  const operatorButtonRef = useRef<HTMLButtonElement>(null);
   const wasClosedRef = useRef(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef(new Map<string, HTMLElement>());
@@ -144,17 +156,18 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
     if (!customerOnly) return;
     const scenario = new URLSearchParams(window.location.search).get("scenario");
     if (!scenario?.startsWith("incident")) return;
-    setRuntime((current) => ({
-      ...current,
-      activeIncident: {
-        ...demoMajorIncident,
-        scope: scenario === "incident-local" || scenario === "incident-irrelevant" ? "local" : "global",
-        targeting: scenario === "incident-local" || scenario === "incident-irrelevant" ? "known-location" : "unknown-location",
-        status: scenario === "incident-resolved" ? "resolved" : "active",
-        expiresAt: scenario === "incident-expired" ? "2020-01-01T00:00:00Z" : demoMajorIncident.expiresAt,
-      },
-      incidentMatch: scenario === "incident-local" ? "matched" : scenario === "incident-irrelevant" ? "not-matched" : "unknown",
-    }));
+    const frame = requestAnimationFrame(() => setRuntime((current) => ({
+        ...current,
+        activeIncident: {
+          ...demoMajorIncident,
+          scope: scenario === "incident-local" || scenario === "incident-irrelevant" ? "local" : "global",
+          targeting: scenario === "incident-local" || scenario === "incident-irrelevant" ? "known-location" : "unknown-location",
+          status: scenario === "incident-resolved" ? "resolved" : "active",
+          expiresAt: scenario === "incident-expired" ? "2020-01-01T00:00:00Z" : demoMajorIncident.expiresAt,
+        },
+        incidentMatch: scenario === "incident-local" ? "matched" : scenario === "incident-irrelevant" ? "not-matched" : "unknown",
+      })));
+    return () => cancelAnimationFrame(frame);
   }, [customerOnly]);
 
   useEffect(() => {
@@ -180,10 +193,22 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
     return () => cancelAnimationFrame(frame);
   }, [chatClosed]);
 
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 96)}px`;
+  }, [draft]);
+
   useEffect(() => {
     const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
     if (!latestAssistant || latestAssistant.id === lastAssistantIdRef.current) return;
     lastAssistantIdRef.current = latestAssistant.id;
+
+    if (chatClosed) {
+      const frame = requestAnimationFrame(() => setHasNewResponse(true));
+      return () => cancelAnimationFrame(frame);
+    }
 
     requestAnimationFrame(() => {
       if (shouldFollowResponseRef.current) {
@@ -198,10 +223,10 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
         setHasNewResponse(true);
       }
     });
-  }, [messages]);
+  }, [chatClosed, messages]);
 
   const lastIntent = useMemo(
-    () => [...messages].reverse().find((message) => message.intent && message.intent.id !== "unknown")?.intent,
+    () => [...messages].reverse().find((message) => message.response && message.response.intent.id !== "unknown")?.response?.intent,
     [messages],
   );
 
@@ -213,6 +238,7 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
     setDraft("");
     setBusy(false);
     setHasNewResponse(false);
+    setLastFailedRequest(null);
     setOperatorPanelOpen(false);
     setChatClosed(false);
     setIncidentDismissed(false);
@@ -225,61 +251,71 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
     const scroller = chatScrollRef.current;
     shouldFollowResponseRef.current = !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 96;
 
-    const userMessage: Message = { id: `user-${Date.now()}`, role: "user", text: displayText || clean, requestText: displayText ? clean : undefined, time: timeNow() };
+    const userMessage: Message = { id: uniqueId("user"), role: "user", text: displayText || clean, requestText: displayText ? clean : undefined, time: timeNow() };
     const nextMessages = [...baseMessages, userMessage];
     setMessages(nextMessages);
     setDraft("");
     setBusy(true);
     const requestGeneration = requestGenerationRef.current;
+    let rawResponsePayload: unknown = null;
 
     try {
-      const response = await fetch("/api/chat", {
+      const requestPayload: ChatRequestV1 = chatRequestV1Schema.parse({
+        contractVersion: "1",
+        requestId: uniqueId("req"),
+        messages: nextMessages.slice(-12).map(({ role, text, requestText }) => ({ role, content: requestText || text })),
+        context: { locale: "cs-CZ", channel: "web" },
+        preferences: { tone },
+      });
+      const response = await fetch("/api/chat/v1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: nextMessages.map(({ role, text, requestText }) => ({ role, content: requestText || text })),
-          tone,
-        }),
+        body: JSON.stringify(requestPayload),
       });
-      const data = await response.json() as {
-        error?: string; mode?: string; reply: string; intent?: Intent;
-        source?: Source | null; sources?: Source[]; card?: AnswerCard | null; quickReplies?: string[];
-      };
+      rawResponsePayload = await response.json().catch(() => null);
       if (requestGeneration !== requestGenerationRef.current) return;
-      if (!response.ok) throw new Error(data.error || "TOBi teď nemůže odpovědět.");
-      setMode(data.mode === "openai" ? "openai" : "mock");
-      setLastFailedRequest(null);
+      const parsedResponse = chatResponseV1Schema.safeParse(rawResponsePayload);
+      if (!parsedResponse.success) throw new Error("invalid_chat_response");
+      const data = parsedResponse.data;
+      setLastFailedRequest(data.mode === "fallback" && data.fallback.retryable ? { text: clean, baseMessages, displayText } : null);
       setMessages((current) => [
         ...current,
         {
-          id: `assistant-${Date.now()}`,
+          id: uniqueId("assistant"),
           role: "assistant",
-          text: data.reply,
+          text: data.text,
           time: timeNow(),
-          intent: data.intent,
-          source: data.source,
-          sources: data.sources,
-          card: data.card,
-          quickReplies: data.quickReplies?.filter((reply) => reply !== "Spojit s člověkem"),
+          response: data,
         },
       ]);
-    } catch (error) {
+    } catch {
       if (requestGeneration !== requestGenerationRef.current) return;
-      setLastFailedRequest({ text: clean, baseMessages });
+      const salvagedText = salvageChatResponseTextV1(rawResponsePayload);
+      const fallback = chatResponseV1Schema.parse({
+        contractVersion: "1",
+        responseId: uniqueId("local"),
+        mode: "fallback",
+        text: salvagedText || "Něco se nepovedlo. Zkuste to prosím znovu.",
+        blocks: [],
+        quickReplies: [],
+        sources: [],
+        intent: { id: "unknown", label: "Potřebuji upřesnit", confidence: 0 },
+        fallback: { code: salvagedText ? "invalid_generation" : "upstream_unavailable", retryable: true },
+      });
+      setLastFailedRequest({ text: clean, baseMessages, displayText });
       setMessages((current) => [
         ...current,
         {
-          id: `error-${Date.now()}`,
+          id: uniqueId("error"),
           role: "assistant",
-          text: error instanceof Error ? error.message : "Něco se nepovedlo. Zkuste to prosím znovu.",
+          text: fallback.text,
           time: timeNow(),
-          quickReplies: ["Zkusit znovu"],
+          response: fallback,
         },
       ]);
     } finally {
       if (requestGeneration === requestGenerationRef.current) {
         setBusy(false);
-        textareaRef.current?.focus({ preventScroll: true });
       }
     }
   }
@@ -294,48 +330,30 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
     setOperatorPanelOpen((open) => !open);
   }
 
-  function handleQuickReply(reply: string) {
+  function handleQuickReply(reply: QuickReplyV1) {
     if (busy) return;
-    if (reply === "Ano, funguje" || reply === "Ne, stále nefunguje") setAnalyticsEvents((events) => [...events, { type: "task_resolution", value: reply === "Ano, funguje" ? "yes" : "no", at: new Date().toISOString() }]);
-    if (reply === "Spojit s člověkem") return requestHandoff();
-    if (reply === "Zkusit znovu" && lastFailedRequest) return void sendMessage(lastFailedRequest.text, lastFailedRequest.baseMessages);
-    if (reply === "Už to funguje" || reply === "Ano, funguje") {
-      const now = Date.now();
+    if (reply.id === "internet-resolved" || reply.id === "internet-not-resolved") setAnalyticsEvents((events) => [...events, { type: "task_resolution", value: reply.id === "internet-resolved" ? "yes" : "no", at: new Date().toISOString() }]);
+    if (reply.id === "internet-resolved") {
       const scroller = chatScrollRef.current;
       shouldFollowResponseRef.current = !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 96;
       setMessages((current) => [
         ...current,
-        { id: `user-${now}`, role: "user", text: reply, time: timeNow() },
-        { id: `assistant-${now + 1}`, role: "assistant", text: "Skvělé, internet už funguje. S čím dalším vám pomůžu?", time: timeNow() },
+        { id: uniqueId("user"), role: "user", text: reply.label, requestText: reply.action.message, time: timeNow() },
+        { id: uniqueId("assistant"), role: "assistant", text: "Skvělé, internet už funguje. S čím dalším vám pomůžu?", time: timeNow() },
       ]);
       return;
     }
-    const contextualPrompts: Record<string, string> = {
-      "Výpadek není hlášený": "Nefunguje mi pevný internet a výpadek na adrese není hlášený.",
-      "Nevím, jaký internet mám": "Nevím, jaký typ pevného internetu mám a potřebuji ho poznat.",
-      "Stále nefunguje": "Pevný internet stále nefunguje ani po restartu modemu.",
-      "Ne, stále nefunguje": "Pevný internet stále nefunguje. Potřebuji pokračovat v diagnostice.",
-      "Internet nejde na žádném zařízení": "Pevný internet po restartu nefunguje na žádném zařízení.",
-      "Funguje na jiném zařízení": "Pevný internet po restartu funguje na jiném zařízení, ale ne na původním.",
-      "První aktivace": "Chci poprvé aktivovat eSIM.",
-      "Přesun do telefonu": "Chci přesunout eSIM do nového telefonu.",
-      "Aktivace selhala": "Aktivace eSIM selhala.",
-      "Najít vyúčtování": "Potřebuji najít vyúčtování v Můj Vodafone.",
-      "Platba se nepropsala": "Platba vyúčtování se nepropsala.",
-      "Vysvětlit částku": "Potřebuji vysvětlit částku na vyúčtování.",
-      "Země v EU": "Potřebuji informace o roamingu v zemi Evropské unie.",
-      "Mimo EU": "Potřebuji informace o roamingu mimo Evropskou unii.",
-      "Roaming nefunguje": "Roaming v zahraničí mi nefunguje.",
-      "Najít PUK": "Potřebuji najít PUK.",
-      "Nastavit nový PIN": "Potřebuji nastavit nový PIN po zadání PUK.",
-      "Nemohu se přihlásit": "Nemohu se přihlásit do Můj Vodafone a potřebuji PUK.",
-      "Ověřit pokrytí": "Potřebuji ověřit pokrytí a řeším potíže se signálem.",
-      "Jen mobilní data": "Nefungují mi mobilní data, ale volání funguje.",
-      "Otevřít čerpání": "Potřebuji otevřít přehled čerpání dat.",
-      "Dokoupit data": "Potřebuji dokoupit mobilní data.",
-      "Vysvětlit útratu": "Potřebuji vysvětlit aktuální útratu.",
-    };
-    void sendMessage(contextualPrompts[reply] || reply, messages, contextualPrompts[reply] ? reply : undefined);
+    void sendMessage(reply.action.message, messages, reply.label);
+  }
+
+  function retryLastRequest() {
+    if (!lastFailedRequest || busy) return;
+    void sendMessage(lastFailedRequest.text, lastFailedRequest.baseMessages, lastFailedRequest.displayText);
+  }
+
+  function selectIntroTopic(prompt: string) {
+    void sendMessage(prompt);
+    requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
   }
 
   function handleChatScroll() {
@@ -350,7 +368,10 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
     if (!latestAssistant) return;
     const scroller = chatScrollRef.current;
     const message = messageRefs.current.get(latestAssistant.id);
-    if (scroller && message) scroller.scrollTo({ top: Math.max(0, message.offsetTop - 20), behavior: "smooth" });
+    if (scroller && message) {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      scroller.scrollTo({ top: Math.max(0, message.offsetTop - 20), behavior: reduceMotion ? "auto" : "smooth" });
+    }
     setHasNewResponse(false);
   }
 
@@ -365,14 +386,30 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.nativeEvent.isComposing) return;
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void sendMessage();
     }
   }
 
+  function onWidgetKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Escape") return;
+    if (operatorPanelOpen) {
+      event.stopPropagation();
+      setOperatorPanelOpen(false);
+      requestAnimationFrame(() => operatorButtonRef.current?.focus({ preventScroll: true }));
+      return;
+    }
+    if (customerOnly) {
+      event.stopPropagation();
+      setChatClosed(true);
+    }
+  }
+
   return (
-    <main className={customerOnly ? "h-[100dvh] overflow-hidden bg-[#f2f2f2]" : "min-h-screen bg-[#f2f2f2] lg:h-screen lg:overflow-hidden"}>
+    <main className={customerOnly ? "min-h-[100dvh] bg-[#f2f2f2]" : "min-h-screen bg-[#f2f2f2] lg:h-screen lg:overflow-hidden"}>
+      {customerOnly ? <CustomerPagePreview chatOpen={!chatClosed} /> : null}
       {!customerOnly ? <header className="flex h-16 items-center justify-between border-b border-[#dedede] bg-white px-4 sm:px-6">
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setMobileSidebar(true)} className="grid h-10 w-10 place-items-center rounded-full border border-[#dedede] lg:hidden" aria-label="Otevřít scénáře"><Menu size={18} /></button>
@@ -389,7 +426,7 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
         </div>
       </header> : null}
 
-      <div className={customerOnly ? "h-[100dvh]" : "grid lg:h-[calc(100vh-64px)] lg:grid-cols-[248px_minmax(500px,1fr)_310px]"}>
+      <div className={customerOnly ? "tobi-customer-layer" : "grid lg:h-[calc(100vh-64px)] lg:grid-cols-[248px_minmax(500px,1fr)_310px]"}>
         {!customerOnly ? <aside className={`${mobileSidebar ? "fixed inset-0 z-50 block bg-black/25" : "hidden"} lg:static lg:z-auto lg:block lg:bg-transparent`} onClick={() => setMobileSidebar(false)}>
           <div className="h-full w-[290px] overflow-y-auto border-r border-[#dedede] bg-white p-4 lg:w-auto" onClick={(event) => event.stopPropagation()}>
             <div className="mb-5 flex items-center justify-between px-1">
@@ -421,7 +458,7 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
           </div>
         </aside> : null}
 
-        <section className={customerOnly ? "relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#f2f2f2] sm:p-6" : "studio-grid relative flex min-h-[calc(100vh-64px)] flex-col overflow-hidden bg-[#f7f7f7] p-3 sm:p-5"}>
+        <section className={customerOnly ? "h-full pointer-events-none" : "studio-grid relative flex min-h-[calc(100vh-64px)] flex-col overflow-hidden bg-[#f7f7f7] p-3 sm:p-5"}>
           {!customerOnly ? <div className="mx-auto mb-3 flex w-full max-w-[780px] items-center justify-between gap-3">
             <div><p className="text-xs font-semibold text-[#777]">Interaktivní náhled</p><h1 className="mt-0.5 text-lg font-extrabold tracking-[-.035em] sm:text-xl">TOBi nové generace</h1></div>
             <div className="hidden items-center gap-2 sm:flex">
@@ -433,27 +470,43 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
             </div>
           </div> : null}
 
-          <div className={`mx-auto flex min-h-0 w-full flex-1 transition-all ${chatClosed ? "items-end justify-end pb-4" : "items-center justify-center"} ${customerOnly ? "h-full max-w-[780px]" : desktopPreview ? "max-w-[780px]" : "max-w-[460px]"}`}>
-            {chatClosed ? (
-              <button ref={launcherRef} type="button" onClick={() => setChatClosed(false)} className="flex min-h-16 items-center gap-3 rounded-full border border-[#dedede] bg-white px-5 text-left shadow-[0_16px_42px_rgba(0,0,0,.14)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_52px_rgba(0,0,0,.17)]">
+          <div data-expanded={customerOnly ? expanded : undefined} className={customerOnly ? "tobi-widget-shell" : `mx-auto flex min-h-0 w-full flex-1 transition-all ${chatClosed ? "items-end justify-end pb-4" : "items-center justify-center"} ${desktopPreview ? "max-w-[560px]" : "max-w-[460px]"}`}>
+              <button
+                ref={launcherRef}
+                hidden={!chatClosed}
+                type="button"
+                onClick={() => setChatClosed(false)}
+                aria-controls="tobi-widget-panel"
+                aria-expanded={!chatClosed}
+                aria-label={hasNewResponse ? "Otevřít chat s TOBim. Nová odpověď." : "Otevřít chat s TOBim"}
+                className="tobi-widget-launcher relative flex min-h-16 items-center gap-3 rounded-full border border-[#dedede] bg-white px-5 text-left shadow-[0_16px_42px_rgba(0,0,0,.14)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_52px_rgba(0,0,0,.17)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]"
+              >
                 <span className="grid h-10 w-10 place-items-center rounded-full bg-[#fff0f0] text-[#e60000]" aria-hidden="true"><Sparkles size={21} fill="currentColor" /></span>
                 <span><span className="block text-sm font-extrabold text-[#222]">Zeptat se TOBiho</span><span className="block text-[11px] text-[#777]">AI asistent</span></span>
+                {hasNewResponse ? <span className="absolute right-3 top-2 h-3 w-3 rounded-full border-2 border-white bg-[#e60000]" aria-hidden="true" /> : null}
               </button>
-            ) : (
-            <div className={`flex min-h-0 w-full flex-col overflow-hidden bg-white ${customerOnly ? "h-[100dvh] rounded-none border-0 shadow-none sm:h-[min(800px,calc(100dvh-48px))] sm:rounded-[26px] sm:border sm:border-[#d7d7d7] sm:shadow-[0_26px_70px_rgba(0,0,0,.14)]" : "h-[min(740px,calc(100vh-132px))] rounded-[26px] border border-[#d7d7d7] shadow-[0_26px_70px_rgba(0,0,0,.14)]"}`}>
-              <header className="relative border-b border-[#e9e9e9] bg-white px-2 py-3 min-[360px]:px-3 sm:px-4">
+            <div
+              id="tobi-widget-panel"
+              hidden={chatClosed}
+              role="region"
+              aria-labelledby="tobi-widget-title"
+              onKeyDown={onWidgetKeyDown}
+              className={`min-h-0 w-full flex-col overflow-hidden bg-white ${chatClosed ? "hidden" : "flex"} ${customerOnly ? "tobi-widget-panel rounded-[20px] border border-[#d7d7d7] shadow-[0_22px_60px_rgba(0,0,0,.16)] max-md:rounded-none max-md:border-0 max-md:shadow-none" : "h-[min(740px,calc(100vh-132px))] rounded-[26px] border border-[#d7d7d7] shadow-[0_26px_70px_rgba(0,0,0,.14)]"}`}
+            >
+              <header className="relative shrink-0 border-b border-[#e9e9e9] bg-white px-2 py-2 min-[360px]:px-3 sm:px-4">
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex shrink-0 items-center gap-1 min-[360px]:gap-2">
                     <span className="grid h-6 w-6 shrink-0 place-items-center text-[#e60000] min-[360px]:h-10 min-[360px]:w-10 min-[360px]:rounded-full min-[360px]:bg-[#fff0f0]" aria-hidden="true"><Sparkles size={20} fill="currentColor" /></span>
-                    <div className="shrink-0 whitespace-nowrap text-[length:var(--tobi-font-title)] font-bold leading-6 text-[#222]">{config.brand.name}</div>
+                    <div id="tobi-widget-title" className="shrink-0 whitespace-nowrap text-[length:var(--tobi-font-title)] font-bold leading-6 text-[#222]">{config.brand.name}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-0 min-[360px]:gap-1">
-                    <button type="button" onClick={requestHandoff} aria-expanded={operatorPanelOpen} aria-label={`Pomoc operátora. ${operatorAccessibleCopy}`} title={operatorAccessibleCopy} className="relative grid h-11 w-11 place-items-center rounded-full border border-[#dedede] text-[#444] transition hover:bg-[#f5f5f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]">
+                    <button ref={operatorButtonRef} type="button" onClick={requestHandoff} aria-expanded={operatorPanelOpen} aria-label={`Pomoc operátora. ${operatorAccessibleCopy}`} title={operatorAccessibleCopy} className="relative grid h-11 w-11 place-items-center rounded-full border border-[#dedede] text-[#444] transition hover:bg-[#f5f5f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]">
                       <Headphones size={18} aria-hidden="true" />
                       <span className={`absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full border-2 ${runtime.operatorAvailability === "online" ? "border-white bg-[#16853e]" : runtime.operatorAvailability === "offline" ? "border-white bg-[#777]" : "border-[#777] bg-white"}`} aria-hidden="true" />
                     </button>
                     <button type="button" onClick={reset} title="Nový chat" className="grid h-11 w-11 place-items-center rounded-full border border-[#dedede] text-[#444] transition hover:bg-[#f5f5f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]" aria-label="Nový chat"><SquarePen size={18} aria-hidden="true" /></button>
-                    <button type="button" onClick={() => { setChatClosed(true); setOperatorPanelOpen(false); }} title="Zavřít" className="grid h-11 w-11 place-items-center rounded-full border border-[#dedede] text-[#444] transition hover:bg-[#f5f5f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]" aria-label="Zavřít chat"><X size={18} aria-hidden="true" /></button>
+                    {customerOnly ? <button type="button" onClick={() => setExpanded((current) => !current)} title={expanded ? "Zmenšit chat" : "Rozšířit chat"} className="hidden h-11 w-11 place-items-center rounded-full border border-[#dedede] text-[#444] transition hover:bg-[#f5f5f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000] md:grid" aria-label={expanded ? "Zmenšit chat" : "Rozšířit chat"} aria-pressed={expanded}>{expanded ? <Minimize2 size={18} aria-hidden="true" /> : <Maximize2 size={18} aria-hidden="true" />}</button> : null}
+                    <button type="button" onClick={() => { setChatClosed(true); setOperatorPanelOpen(false); }} title="Zavřít chat" className="grid h-11 w-11 place-items-center rounded-full border border-[#dedede] text-[#444] transition hover:bg-[#f5f5f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]" aria-label="Zavřít chat"><X size={18} aria-hidden="true" /></button>
                   </div>
                 </div>
                 <p className="mt-2 text-xs leading-4 text-[#666]">{config.brand.disclaimer}</p>
@@ -468,8 +521,11 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
 
               <div className="relative min-h-0 flex-1">
                 <div aria-live="polite" className="sr-only">{!busy && messages.at(-1)?.role === "assistant" ? messages.at(-1)?.text : ""}</div>
-                <div ref={chatScrollRef} onScroll={handleChatScroll} className="chat-scrollbar h-full space-y-5 overflow-y-auto bg-white px-4 py-5 sm:px-5">
-                  {messages.map((message, index) => (
+                <div ref={chatScrollRef} onScroll={handleChatScroll} className={`chat-scrollbar h-full overflow-y-auto bg-white ${customerOnly ? "space-y-5 px-4 py-5 min-[480px]:space-y-4 min-[480px]:py-4" : "space-y-5 px-4 py-5 sm:px-5"}`}>
+                  {messages.map((message, index) => {
+                    const response = message.response;
+                    const hasStructuredContent = response?.blocks.some((block) => block.type !== "sourceList") || false;
+                    return (
                     <article
                       key={message.id}
                       ref={(node) => { if (node) messageRefs.current.set(message.id, node); else messageRefs.current.delete(message.id); }}
@@ -482,61 +538,54 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
                         </div>
                       ) : (
                         <>
-                          {!(index === 0 && messages.length === 1 && showMajorIncident) ? index === 0 && messages.length === 1 ? <h2 className="max-w-[65ch] text-xl font-bold leading-[26px] text-[#222] sm:text-[22px] sm:leading-7">{message.text}</h2> : <p className={`text-[length:var(--tobi-font-message)] leading-[var(--tobi-line-message)] text-[#333] ${message.card ? "max-w-[65ch]" : "rounded-[var(--tobi-radius-bubble)] border border-[#e5e5e5] bg-[#fafafa] px-4 py-3"}`}>{message.text}</p> : null}
+                          {!(index === 0 && messages.length === 1 && showMajorIncident) ? index === 0 && messages.length === 1 ? <h2 className="max-w-[65ch] text-xl font-bold leading-[26px] text-[#222] sm:text-[22px] sm:leading-7">{message.text}</h2> : <p className={`text-[length:var(--tobi-font-message)] leading-[var(--tobi-line-message)] text-[#333] ${hasStructuredContent ? "max-w-[65ch]" : "rounded-[var(--tobi-radius-bubble)] border border-[#e5e5e5] bg-[#fafafa] px-4 py-3"}`}>{message.text}</p> : null}
                           {config.features.timestamps ? <span className="mt-1 block text-[10px] text-[#999]">{message.time}</span> : null}
 
-                          {index === 0 && messages.length === 1 && (showMajorIncident && incident ? <div className="mt-1"><IncidentCard incident={incident} onOtherTopic={() => setIncidentDismissed(true)} /></div> : <div className="mt-2"><CapabilityCarousel items={config.introUseCases} onSelect={(prompt) => void sendMessage(prompt)} wideBreakpoint={config.presentation.carousel.wideBreakpoint} /><p className="mt-4 text-sm leading-5 text-[#666]">Nebo mi napište vlastní dotaz.</p></div>)}
+                          {index === 0 && messages.length === 1 && (showMajorIncident && incident ? <div className="mt-1"><IncidentCard incident={incident} onOtherTopic={() => setIncidentDismissed(true)} /></div> : <div className="mt-3">{config.presentation.intro.renderMode === "carousel" ? <CapabilityCarousel items={config.introUseCases} onSelect={selectIntroTopic} wideBreakpoint={config.presentation.carousel.wideBreakpoint} /> : <IntroTopics items={config.introUseCases} initialVisibleCount={config.presentation.intro.initialVisibleCount} onSelect={selectIntroTopic} />}<p className="mt-3 text-sm leading-5 text-[#666]">Nebo mi napište vlastní dotaz.</p></div>)}
 
-                          {message.card && config.features.mediaCards && message.card.mediaCards?.length ? (
-                            <div className="mt-3">
-                              <MediaCarousel cards={message.card.mediaCards} mode={config.presentation.renderMode} loop={config.presentation.carousel.loop} wideBreakpoint={config.presentation.carousel.wideBreakpoint} />
-                            </div>
-                          ) : message.card ? (
-                            <section className="mt-3 rounded-2xl border border-[#dedede] bg-white p-4">
-                              <h3 className="text-base font-extrabold text-[#222]">{message.card.title}</h3>
-                              <ol className="mt-3 grid gap-2">
-                                {message.card.steps.map((step, stepIndex) => <li key={step} className="flex items-start gap-3 rounded-xl bg-[#fafafa] p-3 text-xs leading-5 text-[#444]"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#fff0f0] text-[11px] font-extrabold text-[#bd0000]">{stepIndex + 1}</span><span>{step}</span></li>)}
-                              </ol>
-                              {message.card.warning && <div className="mt-3 flex gap-2 rounded-xl bg-[#fff6df] p-3 text-[11px] leading-4 text-[#695015]"><CircleHelp size={15} className="mt-0.5 shrink-0" /> {message.card.warning}</div>}
-                              {message.card.actionUrl && <a href={message.card.actionUrl} target="_blank" rel="noreferrer" className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#e60000] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#bd0000]">{message.card.actionLabel} <ExternalLink size={13} /></a>}
-                            </section>
-                          ) : null}
+                          {response ? <ChatBlockRenderer
+                            response={response}
+                            preferMedia={config.features.mediaCards}
+                            showPresetSources={config.features.sources}
+                            renderMode={config.presentation.renderMode}
+                            loop={config.presentation.carousel.loop}
+                            wideBreakpoint={config.presentation.carousel.wideBreakpoint}
+                            busy={busy}
+                            onSendMessage={(text, label) => void sendMessage(text, messages, label)}
+                          /> : null}
 
-                          {config.features.sources && (message.sources?.length || message.source) && (() => {
-                            const sources = (message.sources?.length ? message.sources : message.source ? [message.source] : []).slice(0, 3);
-                            return <details className="group mt-2 text-[11px] text-[#777]"><summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-lg px-1 font-semibold hover:text-[#333]"><span>Zdroje · {sources.length}</span><ChevronDown size={13} className="transition group-open:rotate-180" /></summary><div className="mt-1 space-y-1 border-l border-[#ddd] pl-3">{sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 py-1 text-[#666] underline decoration-[#bbb] underline-offset-2 hover:text-[#222]"><span className="min-w-0 flex-1">{source.title}</span><ExternalLink size={11} className="shrink-0" /></a>)}</div></details>;
-                          })()}
-
-                          {!!message.quickReplies?.length && (
+                          {!!response?.quickReplies.length && (
                             <div>
-                            {message.intent?.id === "internet" ? <p className="mt-4 text-sm font-semibold text-[#444]">Funguje už připojení?</p> : null}
+                            {response.intent.id === "internet" ? <p className="mt-4 text-sm font-semibold text-[#444]">Funguje už připojení?</p> : null}
                             <div className="mt-3 flex flex-wrap gap-2">
-                              {message.quickReplies.slice(0, 2).map((reply) => <button key={reply} type="button" disabled={busy} onClick={() => handleQuickReply(reply)} className="min-h-11 rounded-full border border-[#d3d3d3] bg-white px-4 py-2 text-sm font-semibold leading-5 text-[#333] transition hover:border-[#e60000] hover:text-[#bd0000] disabled:cursor-not-allowed disabled:opacity-50">{reply}</button>)}
+                              {response.quickReplies.slice(0, 2).map((reply) => <button key={reply.id} type="button" disabled={busy} onClick={() => handleQuickReply(reply)} className="min-h-11 rounded-full border border-[#d3d3d3] bg-white px-4 py-2 text-sm font-semibold leading-5 text-[#333] transition hover:border-[#e60000] hover:text-[#bd0000] disabled:cursor-not-allowed disabled:opacity-50">{reply.label}</button>)}
                             </div>
                             </div>
                           )}
 
-                          {config.features.feedback && index > 0 && message.intent?.id !== "internet" && (
+                          {response?.mode === "fallback" && response.fallback.retryable && lastFailedRequest && message.id === messages.at(-1)?.id ? <div className="mt-3"><button type="button" disabled={busy} onClick={retryLastRequest} className="min-h-11 rounded-full border border-[#d3d3d3] bg-white px-4 py-2 text-sm font-semibold leading-5 text-[#333] transition hover:border-[#e60000] hover:text-[#bd0000] disabled:cursor-not-allowed disabled:opacity-50">Zkusit znovu</button></div> : null}
+
+                          {config.features.feedback && index > 0 && response?.intent.id !== "internet" && (
                             <div className="mt-3 flex items-center gap-1 text-xs text-[#777]"><span className="mr-1">Byla tato odpověď užitečná?</span><button type="button" onClick={() => rateMessage(message.id, "up")} className={`grid h-11 w-11 place-items-center rounded-full ${message.feedback === "up" ? "bg-[#e1f5e7] text-[#16853e]" : "hover:bg-[#eee]"}`} aria-label="Odpověď byla užitečná"><ThumbsUp size={15} /></button><button type="button" onClick={() => rateMessage(message.id, "down")} className={`grid h-11 w-11 place-items-center rounded-full ${message.feedback === "down" ? "bg-[#ffe5e5] text-[#bd0000]" : "hover:bg-[#eee]"}`} aria-label="Odpověď nebyla užitečná"><ThumbsDown size={15} /></button></div>
                           )}
                         </>
                       )}
                     </article>
-                  ))}
+                    );
+                  })}
 
                   {busy && <div className="message-rise flex items-center gap-2 text-xs text-[#666]" role="status"><span>TOBi připravuje odpověď</span><span className="flex gap-1">{[0, 1, 2].map((dot) => <span key={dot} className="h-1.5 w-1.5 rounded-full bg-[#e60000]" style={{ animation: `blink 1.1s ${dot * 0.15}s infinite` }} />)}</span></div>}
                 </div>
                 {hasNewResponse && <button type="button" onClick={revealLatestResponse} className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-[#d7d7d7] bg-white px-4 py-2 text-xs font-bold text-[#333] shadow-lg">Nová odpověď ↓</button>}
               </div>
 
-              <form onSubmit={onSubmit} className={`border-t border-[#e1e1e1] bg-white p-3 sm:p-4 ${customerOnly ? "pb-[max(.75rem,env(safe-area-inset-bottom))]" : ""}`}>
-                <div className="flex items-end gap-2 rounded-[18px] border border-[#ccc] bg-white p-2 pl-4 transition focus-within:border-[#e60000] focus-within:ring-4 focus-within:ring-[#ffe5e5]">
-                  <textarea ref={textareaRef} rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder="Napište zprávu…" aria-label="Zpráva pro TOBiho" className={`max-h-24 min-h-10 flex-1 resize-none bg-transparent py-2.5 leading-5 outline-none placeholder:text-[#888] ${customerOnly ? "text-base" : "text-[14px]"}`} />
+              <form onSubmit={onSubmit} className={`shrink-0 border-t border-[#e1e1e1] bg-white ${customerOnly ? "p-3 pb-[max(.75rem,env(safe-area-inset-bottom))]" : "p-3 sm:p-4"}`}>
+                <div className="flex min-h-14 items-end gap-2 rounded-[18px] border border-[#ccc] bg-white p-2 pl-4 transition focus-within:border-[#e60000] focus-within:ring-4 focus-within:ring-[#ffe5e5]">
+                  <textarea ref={textareaRef} rows={1} maxLength={4_000} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder="Napište zprávu…" aria-label="Zpráva pro TOBiho" className={`max-h-24 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-2.5 leading-5 outline-none placeholder:text-[#888] ${customerOnly ? "text-base" : "text-[14px]"}`} />
                   <button type="submit" disabled={!draft.trim() || busy} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#e60000] text-white transition hover:bg-[#bd0000] disabled:cursor-not-allowed disabled:bg-[#ef9b9b]" aria-label="Odeslat"><Send size={17} /></button>
                 </div>
               </form>
             </div>
-            )}
           </div>
         </section>
 
@@ -556,6 +605,8 @@ export default function TobiStudio({ customerOnly = false }: { customerOnly?: bo
               <div className="flex items-center justify-between py-1"><div className="text-xs font-bold">Ukázat časy</div><Toggle checked={config.features.timestamps} onChange={() => setConfig((value) => ({ ...value, features: { ...value.features, timestamps: !value.features.timestamps } }))} label="Ukázat časy zpráv" /></div>
               <div className="my-3 border-t border-[#eee]" />
               <div className="py-1"><div className="text-xs font-bold">Prezentace kroků</div><div className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-[#eee] p-1">{(["carousel", "cards", "list"] as const).map((renderMode) => <button key={renderMode} type="button" onClick={() => setConfig((value) => ({ ...value, presentation: { ...value.presentation, renderMode } }))} className={`rounded-lg px-1 py-2 text-[9px] font-bold ${config.presentation.renderMode === renderMode ? "bg-white shadow-sm" : "text-[#666]"}`}>{renderMode === "carousel" ? "Carousel" : renderMode === "cards" ? "Karty" : "Seznam"}</button>)}</div></div>
+              <div className="my-3 border-t border-[#eee]" />
+              <div className="py-1"><div className="text-xs font-bold">Úvodní témata</div><div className="mt-2 grid grid-cols-2 gap-1 rounded-xl bg-[#eee] p-1">{(["compact", "carousel"] as const).map((renderMode) => <button key={renderMode} type="button" onClick={() => setConfig((value) => ({ ...value, presentation: { ...value.presentation, intro: { ...value.presentation.intro, renderMode } } }))} className={`rounded-lg px-1 py-2 text-[9px] font-bold ${config.presentation.intro.renderMode === renderMode ? "bg-white shadow-sm" : "text-[#666]"}`}>{renderMode === "compact" ? "Seznam" : "Carousel"}</button>)}</div></div>
             </section>
 
             <section><div className="mb-2 flex items-center justify-between"><label className="text-xs font-bold text-[#555]">Znalostní báze</label><span className="flex items-center gap-1 text-[10px] font-bold text-[#16853e]"><span className="h-1.5 w-1.5 rounded-full bg-[#16853e]" /> {knowledgeCount} článků</span></div><div className="overflow-hidden rounded-2xl border border-[#e1e1e1]">{knowledgeAreas.map((source) => <div key={source} className="flex items-center gap-2 border-b border-[#eee] px-3 py-2.5 last:border-0"><FileText size={13} className="text-[#e60000]" /><span className="flex-1 text-[11px] font-semibold text-[#555]">{source}</span><Check size={12} className="text-[#16853e]" /></div>)}</div></section>

@@ -7,14 +7,18 @@ import useEmblaCarousel from "embla-carousel-react";
 
 import type { MediaCard, RenderMode } from "@/lib/tobi-config";
 
+type CarouselMediaCard = MediaCard & { actionMessage?: string };
+
 type MediaCarouselProps = {
-  cards: MediaCard[];
+  cards: CarouselMediaCard[];
   mode: RenderMode;
   loop?: boolean;
   wideBreakpoint?: number;
+  busy?: boolean;
+  onSendMessage?: (message: string, label: string) => void;
 };
 
-function Card({ card, step }: { card: MediaCard; step: number }) {
+function Card({ card, step, busy = false, onSendMessage }: { card: CarouselMediaCard; step: number; busy?: boolean; onSendMessage?: (message: string, label: string) => void }) {
   const [imageFailed, setImageFailed] = useState(false);
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#dddddd] bg-white shadow-[0_2px_8px_rgba(0,0,0,.04)]">
@@ -40,13 +44,22 @@ function Card({ card, step }: { card: MediaCard; step: number }) {
             {card.actionLabel}
             {card.external ? <ExternalLink className="h-4 w-4" aria-hidden="true" /> : null}
           </a>
+        ) : card.actionLabel && card.actionMessage ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onSendMessage?.(card.actionMessage!, card.actionLabel!)}
+            className="mt-auto inline-flex min-h-11 items-center justify-center rounded-full border border-[#222] px-4 py-2 text-center text-sm font-bold text-[#222] transition hover:bg-[#f3f3f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {card.actionLabel}
+          </button>
         ) : null}
       </div>
     </article>
   );
 }
 
-export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520 }: MediaCarouselProps) {
+export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520, busy = false, onSendMessage }: MediaCarouselProps) {
   const [viewportRef, emblaApi] = useEmblaCarousel({ align: "start", containScroll: "trimSnaps", loop });
   const containerRef = useRef<HTMLElement>(null);
   const [isWide, setIsWide] = useState(false);
@@ -90,7 +103,7 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520 
     return (
       <div className="@container">
         <div className={mode === "cards" ? "grid gap-3 @min-[520px]:grid-cols-2" : "grid gap-3"}>
-          {cards.map((card, index) => <Card key={card.id} card={card} step={index + 1} />)}
+          {cards.map((card, index) => <Card key={card.id} card={card} step={index + 1} busy={busy} onSendMessage={onSendMessage} />)}
         </div>
       </div>
     );
@@ -103,8 +116,9 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520 
         className="overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]"
         tabIndex={0}
         onKeyDown={(event) => {
-          if (event.key === "ArrowLeft") { event.preventDefault(); emblaApi?.scrollPrev(); }
-          if (event.key === "ArrowRight") { event.preventDefault(); emblaApi?.scrollNext(); }
+          const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          if (event.key === "ArrowLeft") { event.preventDefault(); emblaApi?.scrollPrev(reduceMotion); }
+          if (event.key === "ArrowRight") { event.preventDefault(); emblaApi?.scrollNext(reduceMotion); }
         }}
         aria-roledescription="carousel"
       >
@@ -117,14 +131,14 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520 
               role="group"
               aria-label={`${index + 1} z ${cards.length}`}
             >
-              <Card card={card} step={index + 1} />
+              <Card card={card} step={index + 1} busy={busy} onSendMessage={onSendMessage} />
             </div>
           ))}
         </div>
       </div>
 
       {cards.length > 1 ? <div className="mt-3 flex items-center justify-between gap-3">
-        <button type="button" onClick={() => emblaApi?.scrollPrev()} disabled={!canPrev} className="grid h-11 w-11 place-items-center rounded-full border border-[#cccccc] text-[#222] disabled:opacity-35" aria-label="Předchozí karty">
+        <button type="button" onClick={() => emblaApi?.scrollPrev(window.matchMedia("(prefers-reduced-motion: reduce)").matches)} disabled={!canPrev} className="grid h-11 w-11 place-items-center rounded-full border border-[#cccccc] text-[#222] disabled:opacity-35" aria-label="Předchozí karty">
           <ChevronLeft className="h-5 w-5" aria-hidden="true" />
         </button>
         <div className="flex min-w-0 flex-col items-center gap-1">
@@ -133,7 +147,7 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520 
             {cards.map((card, index) => <span key={card.id} className={`h-1.5 rounded-full transition-all ${index >= visibleStart && index <= visibleEnd ? "w-4 bg-[#e60000]" : "w-1.5 bg-[#c8c8c8]"}`} />)}
           </div>
         </div>
-        <button type="button" onClick={() => emblaApi?.scrollNext()} disabled={!canNext} className="grid h-11 w-11 place-items-center rounded-full border border-[#cccccc] text-[#222] disabled:opacity-35" aria-label="Další karty">
+        <button type="button" onClick={() => emblaApi?.scrollNext(window.matchMedia("(prefers-reduced-motion: reduce)").matches)} disabled={!canNext} className="grid h-11 w-11 place-items-center rounded-full border border-[#cccccc] text-[#222] disabled:opacity-35" aria-label="Další karty">
           <ChevronRight className="h-5 w-5" aria-hidden="true" />
         </button>
       </div> : null}

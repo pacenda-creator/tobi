@@ -54,6 +54,10 @@ export const tobiConfigSchema = z.object({
   }),
   presentation: z.object({
     renderMode: renderModeSchema,
+    intro: z.object({
+      renderMode: z.enum(["compact", "carousel"]),
+      initialVisibleCount: z.number().int().nonnegative(),
+    }),
     carousel: z.object({
       loop: z.boolean(),
       wideBreakpoint: z.number().int().positive(),
@@ -90,13 +94,13 @@ export const defaultTobiConfig: TobiConfig = tobiConfigSchema.parse({
     disclaimer: "AI může chybovat. Důležité údaje prosím ověřte.",
   },
   copy: {
-    welcome: "Dobrý den, s čím vám mohu pomoci?",
+    welcome: "S čím vám mohu pomoci?",
     operatorOnline: "Operátor je dostupný",
     operatorOffline: "Operátor teď není dostupný",
     operatorUnknown: "Dostupnost operátora neznáme",
   },
   features: { timestamps: false, sources: true, mediaCards: true, feedback: true, majorIncident: true, majorIncidentServices: ["Pevný internet"] },
-  presentation: { renderMode: "carousel", carousel: { loop: false, wideBreakpoint: 520 } },
+  presentation: { renderMode: "carousel", intro: { renderMode: "compact", initialVisibleCount: 3 }, carousel: { loop: false, wideBreakpoint: 520 } },
   topics: [
     { id: "internet", label: "Internet a Wi‑Fi", detail: "Výpadek, modem, rychlost", icon: "router", prompt: "Nefunguje mi internet doma." },
     { id: "esim", label: "eSIM a SIM", detail: "Aktivace, přesun, výměna", icon: "qr-code", prompt: "Potřebuji aktivovat eSIM" },

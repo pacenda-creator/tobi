@@ -21,6 +21,9 @@
   --tobi-radius-card: 16px;
   --tobi-radius-bubble: 16px;
   --tobi-space-section: 20px;
+  --tobi-widget-compact: 480px;
+  --tobi-widget-expanded: 760px;
+  --tobi-widget-height: 700px;
 }
 
 * { box-sizing: border-box; }
@@ -48,6 +51,63 @@ button { -webkit-tap-highlight-color: transparent; }
 .chat-scrollbar::-webkit-scrollbar { width: 6px; }
 .chat-scrollbar::-webkit-scrollbar-thumb { border-radius: 999px; background: #c8c8c8; }
 
+.tobi-customer-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+.tobi-widget-shell {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  max-width: calc(100vw - 48px);
+  align-items: flex-end;
+  justify-content: flex-end;
+  width: min(var(--tobi-widget-compact), calc(100vw - 48px));
+  pointer-events: none;
+  transition: width 180ms ease;
+}
+.tobi-widget-shell[data-expanded="true"] {
+  width: min(var(--tobi-widget-expanded), calc(100vw - 48px));
+}
+.tobi-widget-panel {
+  width: 100%;
+  height: min(var(--tobi-widget-height), calc(100dvh - 48px));
+  pointer-events: auto;
+}
+.tobi-widget-launcher { pointer-events: auto; }
+
+@media (max-width: 1023px) {
+  .tobi-widget-shell {
+    right: 16px;
+    bottom: 16px;
+    max-width: calc(100vw - 32px);
+    width: min(var(--tobi-widget-compact), calc(100vw - 32px));
+  }
+  .tobi-widget-shell[data-expanded="true"] {
+    width: min(var(--tobi-widget-expanded), calc(100vw - 32px));
+  }
+  .tobi-widget-panel { height: min(var(--tobi-widget-height), calc(100dvh - 32px)); }
+}
+
+@media (max-width: 767px) {
+  .tobi-customer-background[data-chat-open="true"] { display: none; }
+  .tobi-widget-shell,
+  .tobi-widget-shell[data-expanded="true"] {
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+  }
+  .tobi-widget-panel { width: 100%; height: 100dvh; }
+  .tobi-widget-launcher {
+    margin-right: max(16px, env(safe-area-inset-right));
+    margin-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
 @keyframes bob {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   50% { transform: translateY(-4px) rotate(2deg); }
@@ -69,4 +129,5 @@ button { -webkit-tap-highlight-color: transparent; }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+  .tobi-widget-shell { transition: none; }
 }

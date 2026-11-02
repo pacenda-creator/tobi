@@ -13,6 +13,7 @@
     "knowledge:sync": "node scripts/sync-vodafone-knowledge.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --project tsconfig.typecheck.json --pretty false",
+    "test:chat-contract": "node --experimental-strip-types --test scripts/chat-contract-v1.test.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
