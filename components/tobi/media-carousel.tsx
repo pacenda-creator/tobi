@@ -70,11 +70,14 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520,
   const [selected, setSelected] = useState(0);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(cards.length > 1);
-  const visibleStart = Math.min(selected, cards.length - 1);
-  const visibleEnd = Math.min(cards.length - 1, visibleStart + (isWide ? 1 : 0));
-  const positionLabel = visibleStart === visibleEnd
-    ? `Zobrazen krok ${visibleStart + 1} ze ${cards.length}`
-    : `Zobrazeny kroky ${visibleStart + 1} až ${visibleEnd + 1} ze ${cards.length}`;
+  const visibleCount = Math.min(cards.length, isWide ? 2 : 1);
+  const visibleIndices = Array.from({ length: visibleCount }, (_, offset) => loop
+    ? (selected + offset) % cards.length
+    : Math.min(cards.length - 1, selected + offset));
+  const visibleIndexSet = new Set(visibleIndices);
+  const positionLabel = visibleIndices.length === 1
+    ? `Zobrazen krok ${visibleIndices[0] + 1} ze ${cards.length}`
+    : `Zobrazeny kroky ${visibleIndices.map((index) => index + 1).join(" a ")} ze ${cards.length}`;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -122,7 +125,7 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520,
         <div className="min-w-0 text-center">
           <span className="text-xs font-bold text-[#555]" aria-live="polite">{positionLabel}</span>
           <div className="mt-1 flex justify-center gap-1.5" aria-hidden="true">
-            {cards.map((card, index) => <span key={card.id} className={`h-1.5 rounded-full transition-all ${index >= visibleStart && index <= visibleEnd ? "w-4 bg-[#e60000]" : "w-1.5 bg-[#c8c8c8]"}`} />)}
+            {cards.map((card, index) => <span key={card.id} className={`h-1.5 rounded-full transition-all ${visibleIndexSet.has(index) ? "w-4 bg-[#e60000]" : "w-1.5 bg-[#c8c8c8]"}`} />)}
           </div>
         </div>
         <button type="button" onClick={() => emblaApi?.scrollNext(window.matchMedia("(prefers-reduced-motion: reduce)").matches)} disabled={!canNext} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#cccccc] bg-white text-[#222] transition hover:border-[#999] hover:bg-[#fafafa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000] disabled:opacity-35" aria-label="Další karta">
@@ -134,6 +137,7 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520,
         className="overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]"
         tabIndex={0}
         onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
           const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
           if (event.key === "ArrowLeft") { event.preventDefault(); emblaApi?.scrollPrev(reduceMotion); }
           if (event.key === "ArrowRight") { event.preventDefault(); emblaApi?.scrollNext(reduceMotion); }
@@ -148,8 +152,8 @@ export function MediaCarousel({ cards, mode, loop = false, wideBreakpoint = 520,
               style={{ flexBasis: isWide ? "calc(50% - 6px)" : "100%" }}
               role="group"
               aria-label={`${index + 1} z ${cards.length}`}
-              aria-hidden={index < visibleStart || index > visibleEnd}
-              inert={index < visibleStart || index > visibleEnd}
+              aria-hidden={!visibleIndexSet.has(index)}
+              inert={!visibleIndexSet.has(index)}
             >
               <Card card={card} step={index + 1} compact={!isWide} busy={busy} onSendMessage={onSendMessage} />
             </div>
