@@ -6,6 +6,7 @@ import { declaredBodyFits, hasJsonContentType, hasValidMutationOrigin, isTobiAdm
 import { defaultTobiConfig, tobiConfigSchema, toPublicTobiConfig } from "../lib/tobi-config.ts";
 import { readOrSeedTobiConfig, saveTobiConfigInRepository } from "../lib/tobi-config-repository.ts";
 import { createNextTobiConfigSnapshot, mergeTobiConfigDraft, shouldApplyTobiConfigVersion, TobiConfigVersionConflictError } from "../lib/tobi-config-versioning.ts";
+import { ragModelPlanJsonSchema } from "../lib/rag-response-plan.ts";
 import { createOpenAiRequestBody, hasAllowedGenerationEvidence, retrieveConfiguredKnowledge } from "../lib/tobi-runtime-policy.ts";
 
 function requestWithHistory() {
@@ -41,6 +42,12 @@ test("modelový request používá uložený model, prompt a reasoning, ale ne s
     { role: "user", content: "Navazující dotaz" },
   ]);
   assert.equal("tools" in body, false);
+});
+
+test("strict Structured Outputs schema používá podporované anyOf místo oneOf", () => {
+  const serializedSchema = JSON.stringify(ragModelPlanJsonSchema);
+  assert.equal(serializedSchema.includes('"oneOf"'), false);
+  assert.equal(serializedSchema.includes('"anyOf"'), true);
 });
 
 test("web search se přidá jen při povoleném zdroji", () => {
