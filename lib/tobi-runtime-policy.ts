@@ -11,6 +11,27 @@ const instructionsByTone = {
   formal: "Mluv zdvořile, profesionálně a bez emoji.",
 };
 
+function safeOpenAiErrorText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") return undefined;
+  return value
+    .replace(/sk-[A-Za-z0-9_-]+/g, "[REDACTED]")
+    .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]")
+    .slice(0, maxLength);
+}
+
+export function describeOpenAiError(payload: unknown) {
+  if (!payload || typeof payload !== "object" || !("error" in payload)) return {};
+  const error = payload.error;
+  if (!error || typeof error !== "object") return {};
+  const value = error as { type?: unknown; code?: unknown; param?: unknown; message?: unknown };
+  return {
+    type: safeOpenAiErrorText(value.type, 120),
+    code: safeOpenAiErrorText(value.code, 120),
+    param: safeOpenAiErrorText(value.param, 240),
+    message: safeOpenAiErrorText(value.message, 1_000),
+  };
+}
+
 export function retrieveConfiguredKnowledge(query: string, sources: TobiRuntimeConfig["sources"]) {
   return {
     retrieved: sources.localIndex ? searchVodafoneKnowledge(query, 4) : [],

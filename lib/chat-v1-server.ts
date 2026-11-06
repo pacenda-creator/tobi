@@ -17,7 +17,7 @@ import { createSmartDemoResponse } from "@/lib/smart-demo-conversation";
 import type { SearchResult } from "@/lib/vodafone-search";
 import { getTobiAdminConfigSnapshot } from "@/lib/tobi-config-store";
 import type { TobiRuntimeConfig } from "@/lib/tobi-config";
-import { createOpenAiRequestBody, hasAllowedGenerationEvidence, retrieveConfiguredKnowledge } from "@/lib/tobi-runtime-policy";
+import { createOpenAiRequestBody, describeOpenAiError, hasAllowedGenerationEvidence, retrieveConfiguredKnowledge } from "@/lib/tobi-runtime-policy";
 
 type TobiEnv = Cloudflare.Env & {
   OPENAI_API_KEY?: string;
@@ -386,7 +386,7 @@ async function callOpenAi(request: ChatRequestV1, retrieved: SearchResult[], run
   });
   const payload = await apiResponse.json().catch(() => null);
   if (!apiResponse.ok) {
-    console.error("OpenAI Responses API error", { status: apiResponse.status });
+    console.error("OpenAI Responses API error", { status: apiResponse.status, ...describeOpenAiError(payload) });
     return { ok: false as const, reason: "upstream_unavailable" as const };
   }
   const output = extractOutputText(payload);

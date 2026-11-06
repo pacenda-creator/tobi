@@ -7,7 +7,7 @@ import { defaultTobiConfig, tobiConfigSchema, toPublicTobiConfig } from "../lib/
 import { readOrSeedTobiConfig, saveTobiConfigInRepository } from "../lib/tobi-config-repository.ts";
 import { createNextTobiConfigSnapshot, mergeTobiConfigDraft, shouldApplyTobiConfigVersion, TobiConfigVersionConflictError } from "../lib/tobi-config-versioning.ts";
 import { ragModelPlanJsonSchema } from "../lib/rag-response-plan.ts";
-import { createOpenAiRequestBody, hasAllowedGenerationEvidence, retrieveConfiguredKnowledge } from "../lib/tobi-runtime-policy.ts";
+import { createOpenAiRequestBody, describeOpenAiError, hasAllowedGenerationEvidence, retrieveConfiguredKnowledge } from "../lib/tobi-runtime-policy.ts";
 
 function requestWithHistory() {
   return chatRequestV1Schema.parse({
@@ -48,6 +48,16 @@ test("strict Structured Outputs schema používá podporované anyOf místo oneO
   const serializedSchema = JSON.stringify(ragModelPlanJsonSchema);
   assert.equal(serializedSchema.includes('"oneOf"'), false);
   assert.equal(serializedSchema.includes('"anyOf"'), true);
+});
+
+test("diagnostika upstream chyby vypíše jen bezpečný omezený detail", () => {
+  const details = describeOpenAiError({ error: { type: "invalid_request_error", code: "invalid_json_schema", param: "text.format.schema", message: "Schema sk-secret Bearer token" } });
+  assert.deepEqual(details, {
+    type: "invalid_request_error",
+    code: "invalid_json_schema",
+    param: "text.format.schema",
+    message: "Schema [REDACTED] Bearer [REDACTED]",
+  });
 });
 
 test("web search se přidá jen při povoleném zdroji", () => {
