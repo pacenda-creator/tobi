@@ -13,7 +13,7 @@
     "knowledge:sync": "node scripts/sync-vodafone-knowledge.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --project tsconfig.typecheck.json --pretty false",
-    "test:chat-contract": "node --experimental-strip-types --test scripts/chat-contract-v1.test.mjs",
+    "test:chat-contract": "node --experimental-strip-types --test scripts/chat-contract-v1.test.mjs scripts/conversation-orchestrator.test.mjs scripts/demo-scenario-flow.test.mjs scripts/rag-response-plan.test.mjs scripts/smart-demo-conversation.test.mjs scripts/mock-operator.test.mjs scripts/tobi-config.test.mjs scripts/tobi-config-sync.test.mjs scripts/carousel-layout.test.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

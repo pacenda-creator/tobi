@@ -1,4 +1,4 @@
-import type { MediaCard } from "@/lib/tobi-config";
+import type { MediaCard } from "./tobi-config.ts";
 
 export type KnowledgeCard = {
   id: string;
@@ -178,6 +178,23 @@ export const vodafoneKnowledge: KnowledgeCard[] = [
     quickReplies: ["Ověřit pokrytí", "Jen mobilní data"],
     actionLabel: "Otevřít mapu pokrytí",
     actionUrl: "https://www.vodafone.cz/mapa-pokryti/",
+  },
+  {
+    id: "mobile-data",
+    label: "Mobilní data v telefonu",
+    shortLabel: "Obnovení mobilních dat",
+    triggers: ["nefungují mi mobilní data", "nejdou mi mobilní data", "internet v telefonu nefunguje", "mobilní data nefungují"],
+    answer: "Ověříme zapnutí mobilních dat, datový limit a nastavení sítě v telefonu.",
+    steps: [
+      "Vypněte Wi‑Fi a ověřte, že jsou mobilní data zapnutá.",
+      "Zapněte na několik sekund režim Letadlo a potom ho znovu vypněte.",
+      "Restartujte telefon a zkontrolujte nastavení přístupového bodu (APN).",
+    ],
+    sourceTitle: "Vodafone Centrum péče · Internet v telefonu",
+    sourceUrl: "https://www.vodafone.cz/pece/internet-data/internet-v-mobilu/pripojeni-nastaveni-internetu-v-telefonu/",
+    quickReplies: ["Data jsou zapnutá", "Nevidím 4G/5G", "Nefungují ani hovory"],
+    actionLabel: "Otevřít nastavení internetu",
+    actionUrl: "https://www.vodafone.cz/pece/internet-data/internet-v-mobilu/pripojeni-nastaveni-internetu-v-telefonu/",
   },
   {
     id: "usage",

@@ -1,0 +1,89 @@
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+import {
+  chatGPTSignInPath,
+  chatGPTSignOutPath,
+  getChatGPTUser,
+} from "@/app/chatgpt-auth";
+import TobiStudio from "@/components/tobi-studio";
+import { isTobiAdminAuthorized } from "@/lib/tobi-admin-auth";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Administrace TOBi",
+};
+
+const actionClassName =
+  "inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2 text-sm font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]";
+
+function AdminAccessCard({
+  title,
+  description,
+  primaryAction,
+}: {
+  title: string;
+  description: string;
+  primaryAction: ReactNode;
+}) {
+  return (
+    <main className="grid min-h-dvh place-items-center bg-[#f7f7f7] p-6">
+      <section className="w-full max-w-lg rounded-2xl border border-[#dedede] bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-bold text-[#111]">{title}</h1>
+        <p className="mt-2 text-sm leading-6 text-[#555]">{description}</p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          {primaryAction}
+          <Link
+            href="/"
+            className={`${actionClassName} border border-[#d4d4d4] bg-white text-[#222] hover:bg-[#f5f5f5]`}
+          >
+            Otevřít zákaznický chat
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+export default async function TobiAdminPage() {
+  const requestHeaders = await headers();
+  if (isTobiAdminAuthorized(requestHeaders)) return <TobiStudio />;
+
+  const user = await getChatGPTUser();
+  if (!user) {
+    return (
+      <AdminAccessCard
+        title="Administrace TOBi"
+        description="Pro správu TOBi se přihlaste účtem ChatGPT s oprávněním správce."
+        primaryAction={
+          <a
+            href={chatGPTSignInPath("/admin")}
+            target="_top"
+            className={`${actionClassName} bg-[#e60000] text-white hover:bg-[#c90000]`}
+          >
+            Přihlásit se přes ChatGPT
+          </a>
+        }
+      />
+    );
+  }
+
+  return (
+    <AdminAccessCard
+      title="Tento účet nemá přístup k administraci"
+      description="Pokud máte účet správce, odhlaste se a přihlaste se tímto účtem."
+      primaryAction={
+        <a
+          href={chatGPTSignOutPath("/admin")}
+          target="_top"
+          className={`${actionClassName} bg-[#e60000] text-white hover:bg-[#c90000]`}
+        >
+          Odhlásit se
+        </a>
+      }
+    />
+  );
+}

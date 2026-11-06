@@ -15,7 +15,27 @@ function isAllowedHttpsUrl(value: string) {
   }
 }
 
+function isPublicHttpsUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password) return false;
+    const hostname = url.hostname.toLocaleLowerCase("en-US").replace(/^\[|\]$/g, "");
+    if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local")) return false;
+    if (hostname === "::1" || hostname.startsWith("fe80:") || hostname.startsWith("fc") || hostname.startsWith("fd")) return false;
+    const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)?.slice(1).map(Number);
+    if (ipv4) {
+      if (ipv4.some((part) => part > 255)) return false;
+      const [a, b] = ipv4;
+      if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return false;
+    }
+    return hostname.includes(".");
+  } catch {
+    return false;
+  }
+}
+
 const allowedHttpsUrlSchema = z.string().url().refine(isAllowedHttpsUrl, "URL musí používat HTTPS a povolenou doménu.");
+const publicHttpsUrlSchema = z.string().url().refine(isPublicHttpsUrl, "Zdroj musí používat veřejnou HTTPS adresu.");
 const safeAssetUrlSchema = z.string().refine((value) => {
   if (value.startsWith("/")) {
     if (/\\|[\u0000-\u001f\u007f]|%(?:00|2e|2f|5c)/i.test(value)) return false;
@@ -36,6 +56,23 @@ export const chatMessageV1Schema = z.object({
   content: plainTextSchema.max(4_000),
 }).strict();
 
+export const scenarioChoiceV1Schema = z.object({
+  transitionId: contractIdSchema,
+  fromStepId: contractIdSchema,
+  toStepId: contractIdSchema.nullable(),
+}).strict();
+
+export const conversationStateV1Schema = z.object({
+  scenarioId: contractIdSchema,
+  stepId: contractIdSchema,
+  choices: z.array(scenarioChoiceV1Schema).max(20),
+  allowedTransitionIds: z.array(contractIdSchema).max(10),
+}).strict().superRefine((state, context) => {
+  if (new Set(state.allowedTransitionIds).size !== state.allowedTransitionIds.length) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["allowedTransitionIds"], message: "Povolené přechody musí být unikátní." });
+  }
+});
+
 export const chatRequestV1Schema = z.object({
   contractVersion: z.literal(CHAT_CONTRACT_VERSION),
   requestId: contractIdSchema.optional(),
@@ -47,6 +84,8 @@ export const chatRequestV1Schema = z.object({
   preferences: z.object({
     tone: z.enum(["friendly", "brief", "formal"]),
   }).strict().optional(),
+  conversationState: conversationStateV1Schema.nullable().optional(),
+  transitionId: contractIdSchema.optional(),
 }).strict().superRefine((request, context) => {
   if (request.messages.at(-1)?.role !== "user") {
     context.addIssue({
@@ -54,6 +93,9 @@ export const chatRequestV1Schema = z.object({
       path: ["messages"],
       message: "Poslední zpráva musí být od uživatele.",
     });
+  }
+  if (request.transitionId && !request.conversationState) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["transitionId"], message: "Přechod vyžaduje aktivní stav scénáře." });
   }
 });
 
@@ -66,6 +108,7 @@ export const openUrlActionV1Schema = z.object({
 export const sendMessageActionV1Schema = z.object({
   kind: z.literal("sendMessage"),
   message: plainTextSchema.max(4_000),
+  transitionId: contractIdSchema.optional(),
 }).strict();
 
 export const uiActionV1Schema = z.discriminatedUnion("kind", [
@@ -150,7 +193,7 @@ export const quickReplyV1Schema = z.object({
 export const sourceV1Schema = z.object({
   id: contractIdSchema,
   title: plainTextSchema.max(300),
-  url: allowedHttpsUrlSchema,
+  url: publicHttpsUrlSchema,
   checkedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 }).strict();
 
@@ -173,12 +216,15 @@ export const fallbackV1Schema = z.object({
 
 const responseCommonV1Schema = z.object({
   contractVersion: z.literal(CHAT_CONTRACT_VERSION),
+  configVersion: z.number().int().positive().optional(),
   responseId: contractIdSchema,
   text: plainTextSchema.max(2_000),
+  quickReplyPrompt: plainTextSchema.max(200).optional(),
   blocks: z.array(uiBlockV1Schema).max(12),
   quickReplies: z.array(quickReplyV1Schema).max(5),
   sources: z.array(sourceV1Schema).max(5),
   intent: intentV1Schema,
+  conversationState: conversationStateV1Schema.nullable().optional(),
 }).strict();
 
 export const chatResponseV1Schema = z.discriminatedUnion("mode", [
@@ -236,6 +282,7 @@ export function salvageChatResponseTextV1(payload: unknown) {
 
 export type ChatRequestV1 = z.infer<typeof chatRequestV1Schema>;
 export type ChatResponseV1 = z.infer<typeof chatResponseV1Schema>;
+export type ConversationStateV1 = z.infer<typeof conversationStateV1Schema>;
 export type UiBlockV1 = z.infer<typeof uiBlockV1Schema>;
 export type QuickReplyV1 = z.infer<typeof quickReplyV1Schema>;
 export type SourceV1 = z.infer<typeof sourceV1Schema>;

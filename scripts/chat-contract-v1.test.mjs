@@ -46,6 +46,32 @@ test("ChatRequest v1 odmítne konverzaci nezakončenou uživatelem", () => {
   assert.equal(result.success, false);
 });
 
+test("ChatRequest v1 přijme explicitní stav scénáře a transitionId", () => {
+  const result = chatRequestV1Schema.safeParse({
+    contractVersion: "1",
+    messages: [{ role: "user", content: "Pevný internet stále nefunguje." }],
+    context: { locale: "cs-CZ", channel: "web" },
+    conversationState: {
+      scenarioId: "demo-internet",
+      stepId: "initial",
+      choices: [],
+      allowedTransitionIds: ["internet-resolved", "internet-not-resolved"],
+    },
+    transitionId: "internet-not-resolved",
+  });
+  assert.equal(result.success, true);
+});
+
+test("ChatRequest v1 odmítne transitionId bez aktivního stavu", () => {
+  const result = chatRequestV1Schema.safeParse({
+    contractVersion: "1",
+    messages: [{ role: "user", content: "Pokračovat." }],
+    context: { locale: "cs-CZ", channel: "web" },
+    transitionId: "internet-not-resolved",
+  });
+  assert.equal(result.success, false);
+});
+
 test("ChatResponse v1 podporuje všechny schválené UI bloky", () => {
   const result = chatResponseV1Schema.safeParse({
     ...baseResponse,
@@ -119,6 +145,25 @@ test("kontrakt odmítne nebezpečné externí URL", () => {
     blocks: [{ type: "action", id: "action-1", label: "Pokračovat", action: { kind: "openUrl", url: "javascript:alert(1)", external: true } }],
   });
   assert.equal(result.success, false);
+});
+
+test("zdroje dovolí veřejný HTTPS web, ale odmítnou privátní adresu", () => {
+  const publicResult = chatResponseV1Schema.safeParse({
+    ...baseResponse,
+    mode: "rag",
+    fallback: null,
+    sources: [{ ...source, url: "https://support.apple.com/cs-cz/guide/iphone/welcome/ios" }],
+    blocks: [{ type: "sourceList", id: "sources-1", sourceIds: ["source-1"] }],
+  });
+  const privateResult = chatResponseV1Schema.safeParse({
+    ...baseResponse,
+    mode: "rag",
+    fallback: null,
+    sources: [{ ...source, url: "https://127.0.0.1/internal" }],
+    blocks: [{ type: "sourceList", id: "sources-1", sourceIds: ["source-1"] }],
+  });
+  assert.equal(publicResult.success, true);
+  assert.equal(privateResult.success, false);
 });
 
 test("ChatResponse v1 odmítne neznámý UI blok", () => {
