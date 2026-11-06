@@ -44,10 +44,13 @@ test("modelový request používá uložený model, prompt a reasoning, ale ne s
   assert.equal("tools" in body, false);
 });
 
-test("strict Structured Outputs schema používá podporované anyOf místo oneOf", () => {
+test("strict Structured Outputs schema používá jen konzervativně podporované union a string prvky", () => {
   const serializedSchema = JSON.stringify(ragModelPlanJsonSchema);
   assert.equal(serializedSchema.includes('"oneOf"'), false);
   assert.equal(serializedSchema.includes('"anyOf"'), true);
+  assert.equal(serializedSchema.includes('"const"'), false);
+  assert.equal(serializedSchema.includes('"minLength"'), false);
+  assert.equal(serializedSchema.includes('"maxLength"'), false);
 });
 
 test("diagnostika upstream chyby vypíše jen bezpečný omezený detail", () => {

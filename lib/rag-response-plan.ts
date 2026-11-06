@@ -66,22 +66,22 @@ export const ragModelPlanJsonSchema = {
   additionalProperties: false,
   required: ["text", "blocks", "quickReplies"],
   properties: {
-    text: { type: "string", minLength: 1, maxLength: 2000 },
+    text: { type: "string" },
     blocks: {
       type: "array",
       maxItems: 6,
       items: {
         anyOf: [
-          { type: "object", additionalProperties: false, required: ["type", "title", "items"], properties: { type: { const: "steps" }, title: { type: ["string", "null"] }, items: { type: "array", minItems: 1, maxItems: 6, items: { type: "string" } } } },
-          { type: "object", additionalProperties: false, required: ["type", "severity", "title", "text"], properties: { type: { const: "alert" }, severity: { enum: ["info", "warning", "error"] }, title: { type: ["string", "null"] }, text: { type: "string" } } },
-          { type: "object", additionalProperties: false, required: ["type", "title", "text"], properties: { type: { const: "infoCard" }, title: { type: "string" }, text: { type: "string" } } },
-          { type: "object", additionalProperties: false, required: ["type", "label", "message"], properties: { type: { const: "action" }, label: { type: "string" }, message: { type: "string" } } },
+          { type: "object", additionalProperties: false, required: ["type", "title", "items"], properties: { type: { enum: ["steps"] }, title: { type: ["string", "null"] }, items: { type: "array", minItems: 1, maxItems: 6, items: { type: "string" } } } },
+          { type: "object", additionalProperties: false, required: ["type", "severity", "title", "text"], properties: { type: { enum: ["alert"] }, severity: { enum: ["info", "warning", "error"] }, title: { type: ["string", "null"] }, text: { type: "string" } } },
+          { type: "object", additionalProperties: false, required: ["type", "title", "text"], properties: { type: { enum: ["infoCard"] }, title: { type: "string" }, text: { type: "string" } } },
+          { type: "object", additionalProperties: false, required: ["type", "label", "message"], properties: { type: { enum: ["action"] }, label: { type: "string" }, message: { type: "string" } } },
           {
             type: "object",
             additionalProperties: false,
             required: ["type", "cards"],
             properties: {
-              type: { const: "mediaCards" },
+              type: { enum: ["mediaCards"] },
               cards: {
                 type: "array",
                 minItems: 2,
