@@ -1,148 +1,62 @@
-import { findKnowledge } from "@/lib/vodafone-knowledge";
-import { formatRetrievedContext, searchVodafoneKnowledge, type SearchResult } from "@/lib/vodafone-search";
+import { handleChatV1 } from "@/lib/chat-v1-server";
+import { chatResponseV1Schema } from "@/lib/contracts/chat/v1";
 
-type TobiEnv = Cloudflare.Env & {
-  OPENAI_API_KEY?: string;
-  OPENAI_MODEL?: string;
-};
+type LegacyMessage = { role: "assistant" | "user"; content: string };
 
-type IncomingMessage = { role: "assistant" | "user"; content: string };
-
-const instructionsByTone = {
-  friendly: "Mluv lidsky, klidně a stručně. Bez úvodních frází a bez emoji.",
-  brief: "Odpovídej velmi stručně, maximálně ve třech větách.",
-  formal: "Mluv zdvořile, profesionálně a bez emoji.",
-};
-
-function conciseSnippet(snippet: string) {
-  const clean = snippet.replace(/\s+/g, " ").trim();
-  const sentences = clean.match(/[^.!?]+[.!?]+/g)?.slice(0, 2).join(" ").trim() || clean;
-  return sentences.length > 280 ? `${sentences.slice(0, 277).trimEnd()}…` : sentences;
-}
-
-function extractOutputText(payload: unknown) {
-  if (!payload || typeof payload !== "object") return null;
-  const response = payload as {
-    output_text?: string;
-    output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
-  };
-  if (response.output_text) return response.output_text;
-  return response.output
-    ?.flatMap((item) => item.content || [])
-    .filter((item) => item.type === "output_text" && item.text)
-    .map((item) => item.text)
-    .join("\n") || null;
-}
-
-function responseMeta(lastMessage: string, retrieved: SearchResult[]) {
-  const knowledge = findKnowledge(lastMessage);
-  if (!knowledge) {
-    if (retrieved.length) {
-      const primary = retrieved[0];
-      return {
-        intent: { id: "retrieved", label: primary.title, confidence: Math.min(0.91, 0.64 + primary.score / 150) },
-        quickReplies: [],
-        source: { title: primary.title, url: primary.url, checked: "30. 10. 2026" },
-        sources: retrieved.slice(0, 3).map((result) => ({
-          title: result.title,
-          url: result.url,
-          checked: result.updated || "30. 10. 2026",
-        })),
-        card: null,
-      };
-    }
-    return {
-      intent: { id: "unknown", label: "Potřebuji upřesnit", confidence: 0.42 },
-      quickReplies: ["Internet a Wi‑Fi", "eSIM a SIM", "Vyúčtování", "Roaming"],
-      source: null,
-      sources: [],
-      card: null,
-    };
-  }
-  return {
-    intent: { id: knowledge.id, label: knowledge.label, confidence: 0.94 },
-    quickReplies: knowledge.quickReplies,
-    source: { title: knowledge.sourceTitle, url: knowledge.sourceUrl, checked: "30. 10. 2026" },
-    sources: [{ title: knowledge.sourceTitle, url: knowledge.sourceUrl, checked: "30. 10. 2026" }],
-    card: {
-      title: knowledge.shortLabel,
-      steps: knowledge.steps,
-      warning: knowledge.warning,
-      actionLabel: knowledge.actionLabel,
-      actionUrl: knowledge.actionUrl,
-      mediaCards: knowledge.mediaCards,
-    },
-  };
-}
-
+// Compatibility adapter: legacy clients keep their request/response shape, but
+// execution always goes through the same versioned config, RAG and LLM path.
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as null | {
-    messages?: IncomingMessage[];
-    tone?: keyof typeof instructionsByTone;
-  };
-
-  const messages = body?.messages
-    ?.filter(
-      (message): message is IncomingMessage =>
-        (message.role === "assistant" || message.role === "user") &&
-        typeof message.content === "string" &&
-        message.content.trim().length > 0,
-    )
-    .slice(-12);
-
-  if (!messages?.length) {
+  const body = await request.json().catch(() => null) as null | { messages?: LegacyMessage[]; tone?: "friendly" | "brief" | "formal" };
+  const messages = body?.messages?.filter((message): message is LegacyMessage =>
+    (message.role === "assistant" || message.role === "user") && typeof message.content === "string" && message.content.trim().length > 0,
+  ).slice(-12);
+  if (!messages?.length || messages.at(-1)?.role !== "user") {
     return Response.json({ error: "Chybí zpráva pro TOBiho." }, { status: 400 });
   }
 
-  const lastMessage = messages.at(-1)?.content || "";
-  const retrieved = searchVodafoneKnowledge(lastMessage, 4);
-  const meta = responseMeta(lastMessage, retrieved);
-  const knowledge = findKnowledge(lastMessage);
-  const runtime = process.env as TobiEnv;
-
-  // Referenční scénář je záměrně deterministický: copy a kroky jsou součástí UX akceptace.
-  if (knowledge?.id === "internet") {
-    await new Promise((resolve) => setTimeout(resolve, 320));
-    return Response.json({ mode: "mock", reply: knowledge.answer, ...meta });
-  }
-
-  if (!runtime.OPENAI_API_KEY) {
-    await new Promise((resolve) => setTimeout(resolve, 520));
-    return Response.json({
-      mode: "mock",
-      reply: knowledge?.answer
-        || (retrieved.length
-          ? conciseSnippet(retrieved[0].snippet)
-          : "Chci si být jistý, že vám poradím správně. Zkuste prosím doplnit službu nebo zařízení, kterého se dotaz týká."),
-      ...meta,
-    });
-  }
-
-  const tone = body?.tone && instructionsByTone[body.tone] ? body.tone : "friendly";
-  const apiResponse = await fetch("https://api.openai.com/v1/responses", {
+  const v1Request = new Request(new URL("/api/chat/v1", request.url), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${runtime.OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: runtime.OPENAI_MODEL || "gpt-6-astra",
-      instructions: `Jsi TOBi, AI asistent Vodafonu v českém prototypu. Odpověz rovnou na dotaz; nepiš „Rozumím“, „Jasně“, „Na Vodafone.cz jsem našel“ ani podobný úvod. Potvrzení záměru použij jen tehdy, když je dotaz nejasný nebo by chybný výklad mohl zákazníkovi uškodit. Odpovídej pouze z dohledaných zdrojů níže; pokud podklad nestačí, přiznej nejistotu a polož jednu konkrétní doplňující otázku. Nikdy nevymýšlej stav účtu, služby, cenu ani výpadek. Nikdy nežádej PIN, PUK, heslo, celé číslo karty ani QR kód eSIM. Dej jeden další krok, nejvýše tři krátké věty. ${instructionsByTone[tone]}\n\nDOHLEDANÉ ZDROJE Z VODAFONE.CZ:\n${formatRetrievedContext(retrieved) || "Pro tento dotaz nebyl nalezen dostatečně relevantní veřejný zdroj."}`,
-      input: messages.map((message) => ({ role: message.role, content: message.content })),
-      max_output_tokens: 220,
+      contractVersion: "1",
+      requestId: `legacy-${crypto.randomUUID()}`,
+      messages,
+      context: { locale: "cs-CZ", channel: "web" },
+      preferences: { tone: body?.tone || "friendly" },
     }),
   });
+  const v1Response = await handleChatV1(v1Request);
+  const payload = await v1Response.json().catch(() => null);
+  const parsed = chatResponseV1Schema.safeParse(payload);
+  if (!parsed.success) return Response.json(payload || { error: "TOBi se teď nemůže spojit se službou." }, { status: v1Response.status });
 
-  const payload = await apiResponse.json().catch(() => null);
-  if (!apiResponse.ok) {
-    const detail = payload && typeof payload === "object" && "error" in payload
-      ? (payload as { error?: { message?: string } }).error?.message
-      : null;
-    console.error("OpenAI Responses API error", apiResponse.status, detail);
-    return Response.json({ error: "TOBi se teď nemůže spojit s AI. Zkuste to prosím za chvíli." }, { status: 502 });
-  }
-
-  const reply = extractOutputText(payload);
-  if (!reply) return Response.json({ error: "AI vrátila prázdnou odpověď." }, { status: 502 });
-  return Response.json({ mode: "openai", reply, ...meta });
+  const response = parsed.data;
+  const primarySource = response.sources[0];
+  const steps = response.blocks.find((block) => block.type === "steps");
+  const actionBlock = response.blocks.find((block) => block.type === "action");
+  const action = actionBlock?.type === "action" && actionBlock.action.kind === "openUrl"
+    ? actionBlock
+    : undefined;
+  const media = response.blocks.find((block) => block.type === "mediaCards");
+  return Response.json({
+    mode: response.mode === "preset" ? "mock" : response.mode,
+    reply: response.text,
+    configVersion: response.configVersion,
+    intent: response.intent,
+    quickReplies: response.quickReplies.map((reply) => reply.label),
+    source: primarySource ? { title: primarySource.title, url: primarySource.url, checked: primarySource.checkedAt } : null,
+    sources: response.sources.map((source) => ({ title: source.title, url: source.url, checked: source.checkedAt })),
+    card: steps ? {
+      title: steps.title || response.intent.label,
+      steps: steps.items.map((item) => item.text),
+      actionLabel: action?.label,
+      actionUrl: action?.action.kind === "openUrl" ? action.action.url : undefined,
+      mediaCards: media?.cards.map((card) => ({
+        id: card.id, title: card.title, description: card.description, image: card.image.src, imageAlt: card.image.alt,
+        actionLabel: card.action?.label,
+        actionUrl: card.action?.action.kind === "openUrl" ? card.action.action.url : undefined,
+        external: card.action?.action.kind === "openUrl" ? card.action.action.external : false,
+      })),
+    } : null,
+  }, { status: v1Response.status, headers: { "Cache-Control": "no-store" } });
 }

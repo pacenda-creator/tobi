@@ -1,0 +1,74 @@
+[
+  {
+    "id": "RUN-20261108-CHAT",
+    "executedAt": "2026-11-08",
+    "testedRevision": "auditovaný pracovní strom nad HEAD 0473d18fee5cc6929e5b53104697d551f1d9415a; obsahuje necommitnuté změny",
+    "environment": "lokální Node.js test runner",
+    "command": "npm run test:chat-contract",
+    "result": "PASS",
+    "summary": "99/99 testů prošlo, 0 selhání.",
+    "evidence": "docs/portal/evidence/local-runs-2026-11-08.md",
+    "releaseEvidence": false,
+    "caseIds": ["REG-001","REG-002","REG-003","REG-004","REG-005","REG-007","REG-008","REG-009","REG-010","REG-011","REG-012","REG-013","REG-014","REG-015","REG-016","REG-018","REG-019","REG-020","REG-022","REG-023","REG-024","REG-026","REG-037"]
+  },
+  {
+    "id": "RUN-20261108-GATE",
+    "executedAt": "2026-11-08",
+    "testedRevision": "auditovaný pracovní strom nad HEAD 0473d18fee5cc6929e5b53104697d551f1d9415a; obsahuje necommitnuté změny",
+    "environment": "lokální Node.js test runner",
+    "command": "npm run test:release-gate",
+    "result": "PASS",
+    "summary": "7/7 testů prošlo, 0 selhání.",
+    "evidence": "docs/portal/evidence/local-runs-2026-11-08.md",
+    "releaseEvidence": false,
+    "caseIds": ["REG-028"]
+  },
+  {
+    "id": "RUN-20261108-DOCS",
+    "executedAt": "2026-11-08",
+    "testedRevision": "auditovaný pracovní strom nad HEAD 0473d18fee5cc6929e5b53104697d551f1d9415a; obsahuje necommitnuté změny",
+    "environment": "lokální Node.js test runner",
+    "command": "npm run test:docs",
+    "result": "PASS",
+    "summary": "4/4 testy prošly, 0 selhání.",
+    "evidence": "docs/portal/evidence/local-runs-2026-11-08.md",
+    "releaseEvidence": false,
+    "caseIds": ["REG-041","REG-042"]
+  },
+  {
+    "id": "RUN-20261109-CHAT",
+    "executedAt": "2026-11-09",
+    "testedRevision": "auditovaný pracovní strom nad HEAD 0473d18fee5cc6929e5b53104697d551f1d9415a; obsahuje necommitnuté změny",
+    "environment": "lokální Node.js test runner",
+    "command": "npm run test:chat-contract",
+    "result": "PASS",
+    "summary": "117/117 testů prošlo, 0 selhání; včetně 17 testů tarifního katalogu, carouselu jako přímého srovnání bez CTA Porovnat a konverzačního flow.",
+    "evidence": "docs/portal/evidence/local-runs-2026-11-09.md",
+    "releaseEvidence": false,
+    "caseIds": ["REG-001","REG-002","REG-003","REG-004","REG-005","REG-007","REG-008","REG-009","REG-010","REG-011","REG-012","REG-013","REG-014","REG-015","REG-016","REG-018","REG-019","REG-020","REG-022","REG-023","REG-024","REG-026","REG-037","REG-043","REG-045","REG-046","REG-047"]
+  },
+  {
+    "id": "RUN-20261109-TARIFF-E2E",
+    "executedAt": "2026-11-09",
+    "testedRevision": "auditovaný pracovní strom nad HEAD 0473d18fee5cc6929e5b53104697d551f1d9415a; obsahuje necommitnuté změny",
+    "environment": "lokální Playwright, headless Microsoft Edge, reduced motion",
+    "command": "npm run test:tariff-e2e",
+    "result": "PASS",
+    "summary": "8/8 testů přímého carouselového srovnání prošlo v mobilních, kompaktním a desktopovém viewportu, 0 selhání.",
+    "evidence": "docs/portal/evidence/local-runs-2026-11-09.md",
+    "releaseEvidence": false,
+    "caseIds": ["REG-044","REG-048"]
+  },
+  {
+    "id": "RUN-20261109-DOCS",
+    "executedAt": "2026-11-09",
+    "testedRevision": "auditovaný pracovní strom nad HEAD 0473d18fee5cc6929e5b53104697d551f1d9415a; obsahuje necommitnuté změny",
+    "environment": "lokální Node.js test runner",
+    "command": "npm run docs:validate; npm run test:docs",
+    "result": "PASS",
+    "summary": "Dokumentace je strukturálně validní a 4/4 testy interního portálu prošly.",
+    "evidence": "docs/portal/evidence/local-runs-2026-11-09.md",
+    "releaseEvidence": false,
+    "caseIds": ["REG-041","REG-042"]
+  }
+]

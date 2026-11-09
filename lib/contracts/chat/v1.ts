@@ -15,7 +15,27 @@ function isAllowedHttpsUrl(value: string) {
   }
 }
 
+function isPublicHttpsUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password) return false;
+    const hostname = url.hostname.toLocaleLowerCase("en-US").replace(/^\[|\]$/g, "");
+    if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local")) return false;
+    if (hostname === "::1" || hostname.startsWith("fe80:") || hostname.startsWith("fc") || hostname.startsWith("fd")) return false;
+    const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)?.slice(1).map(Number);
+    if (ipv4) {
+      if (ipv4.some((part) => part > 255)) return false;
+      const [a, b] = ipv4;
+      if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return false;
+    }
+    return hostname.includes(".");
+  } catch {
+    return false;
+  }
+}
+
 const allowedHttpsUrlSchema = z.string().url().refine(isAllowedHttpsUrl, "URL musí používat HTTPS a povolenou doménu.");
+const publicHttpsUrlSchema = z.string().url().refine(isPublicHttpsUrl, "Zdroj musí používat veřejnou HTTPS adresu.");
 const safeAssetUrlSchema = z.string().refine((value) => {
   if (value.startsWith("/")) {
     if (/\\|[\u0000-\u001f\u007f]|%(?:00|2e|2f|5c)/i.test(value)) return false;
@@ -36,6 +56,46 @@ export const chatMessageV1Schema = z.object({
   content: plainTextSchema.max(4_000),
 }).strict();
 
+export const scenarioChoiceV1Schema = z.object({
+  transitionId: contractIdSchema,
+  fromStepId: contractIdSchema,
+  toStepId: contractIdSchema.nullable(),
+}).strict();
+
+export const tariffComparisonScenarioDataV1Schema = z.object({
+  kind: z.literal("tariffComparison"),
+  maxMonthlyPriceCzk: z.number().int().min(50).max(100_000).nullable(),
+  minDataGb: z.number().int().min(1).max(10_000).nullable(),
+  unlimitedData: z.boolean().nullable(),
+  selectedTariffIds: z.array(contractIdSchema).max(3),
+}).strict().superRefine((data, context) => {
+  if (new Set(data.selectedTariffIds).size !== data.selectedTariffIds.length) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedTariffIds"], message: "Vybrané tarify musí být unikátní." });
+  }
+});
+
+export const conversationStateV1Schema = z.object({
+  scenarioId: contractIdSchema,
+  stepId: contractIdSchema,
+  choices: z.array(scenarioChoiceV1Schema).max(20),
+  allowedTransitionIds: z.array(contractIdSchema).max(10),
+  scenarioData: tariffComparisonScenarioDataV1Schema.optional(),
+}).strict().superRefine((state, context) => {
+  if (new Set(state.allowedTransitionIds).size !== state.allowedTransitionIds.length) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["allowedTransitionIds"], message: "Povolené přechody musí být unikátní." });
+  }
+  const isTariffScenario = state.scenarioId === "tariff-comparison-v1";
+  if (isTariffScenario !== Boolean(state.scenarioData)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenarioData"], message: "Data tarifního scénáře neodpovídají scenarioId." });
+  }
+  if (state.scenarioData && state.stepId === "shortlist" && state.scenarioData.selectedTariffIds.length < 1) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenarioData", "selectedTariffIds"], message: "Výběr musí obsahovat alespoň jeden tarif." });
+  }
+  if (state.scenarioData && state.stepId === "comparison" && state.scenarioData.selectedTariffIds.length < 2) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenarioData", "selectedTariffIds"], message: "Srovnání musí obsahovat dva až tři tarify." });
+  }
+});
+
 export const chatRequestV1Schema = z.object({
   contractVersion: z.literal(CHAT_CONTRACT_VERSION),
   requestId: contractIdSchema.optional(),
@@ -47,6 +107,8 @@ export const chatRequestV1Schema = z.object({
   preferences: z.object({
     tone: z.enum(["friendly", "brief", "formal"]),
   }).strict().optional(),
+  conversationState: conversationStateV1Schema.nullable().optional(),
+  transitionId: contractIdSchema.optional(),
 }).strict().superRefine((request, context) => {
   if (request.messages.at(-1)?.role !== "user") {
     context.addIssue({
@@ -54,6 +116,9 @@ export const chatRequestV1Schema = z.object({
       path: ["messages"],
       message: "Poslední zpráva musí být od uživatele.",
     });
+  }
+  if (request.transitionId && !request.conversationState) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["transitionId"], message: "Přechod vyžaduje aktivní stav scénáře." });
   }
 });
 
@@ -66,11 +131,18 @@ export const openUrlActionV1Schema = z.object({
 export const sendMessageActionV1Schema = z.object({
   kind: z.literal("sendMessage"),
   message: plainTextSchema.max(4_000),
+  transitionId: contractIdSchema.optional(),
+}).strict();
+
+export const requestUploadActionV1Schema = z.object({
+  kind: z.literal("requestUpload"),
+  purpose: z.literal("router-diagnostics-v1"),
 }).strict();
 
 export const uiActionV1Schema = z.discriminatedUnion("kind", [
   openUrlActionV1Schema,
   sendMessageActionV1Schema,
+  requestUploadActionV1Schema,
 ]);
 
 export const stepsBlockV1Schema = z.object({
@@ -102,6 +174,7 @@ export const actionBlockV1Schema = z.object({
   type: z.literal("action"),
   id: contractIdSchema,
   label: plainTextSchema.max(120),
+  appearance: z.enum(["primary", "secondary", "toggle"]).optional(),
   action: uiActionV1Schema,
 }).strict();
 
@@ -122,7 +195,43 @@ export const mediaCardV1Schema = z.object({
 export const mediaCardsBlockV1Schema = z.object({
   type: z.literal("mediaCards"),
   id: contractIdSchema,
-  cards: z.array(mediaCardV1Schema).min(1).max(6),
+  presentation: z.enum(["steps", "selection"]).optional(),
+  cards: z.array(mediaCardV1Schema).min(1).max(8),
+}).strict();
+
+const tariffComparisonDataV1Schema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("limited"), gb: z.number().int().positive().max(10_000) }).strict(),
+  z.object({ kind: z.literal("unlimited"), speedMbps: z.number().int().positive().max(10_000).nullable() }).strict(),
+]);
+
+export const tariffComparisonItemV1Schema = z.object({
+  tariffId: contractIdSchema,
+  name: plainTextSchema.max(100),
+  monthlyPriceCzk: z.number().int().positive().max(100_000),
+  listPriceCzk: z.number().int().positive().max(100_000).optional(),
+  priceCondition: plainTextSchema.max(240),
+  data: tariffComparisonDataV1Schema,
+  calls: z.literal("unlimited"),
+  sms: z.literal("unlimited"),
+  commitment: z.literal("none"),
+  detailUrl: allowedHttpsUrlSchema,
+  mismatch: plainTextSchema.max(240).optional(),
+}).strict().superRefine((tariff, context) => {
+  if (tariff.listPriceCzk !== undefined && tariff.listPriceCzk < tariff.monthlyPriceCzk) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["listPriceCzk"], message: "Běžná cena nesmí být nižší než aktuální cena." });
+  }
+});
+
+export const tariffComparisonBlockV1Schema = z.object({
+  type: z.literal("tariffComparison"),
+  id: contractIdSchema,
+  title: plainTextSchema.max(160),
+  presentation: z.enum(["carousel", "table"]).default("table"),
+  warning: plainTextSchema.max(240).optional(),
+  catalogVersion: contractIdSchema,
+  checkedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  tariffs: z.array(tariffComparisonItemV1Schema).min(1).max(3),
+  highlightedTariffId: contractIdSchema.optional(),
 }).strict();
 
 export const sourceListBlockV1Schema = z.object({
@@ -138,19 +247,20 @@ export const uiBlockV1Schema = z.discriminatedUnion("type", [
   infoCardBlockV1Schema,
   actionBlockV1Schema,
   mediaCardsBlockV1Schema,
+  tariffComparisonBlockV1Schema,
   sourceListBlockV1Schema,
 ]);
 
 export const quickReplyV1Schema = z.object({
   id: contractIdSchema,
   label: plainTextSchema.max(120),
-  action: sendMessageActionV1Schema,
+  action: z.discriminatedUnion("kind", [sendMessageActionV1Schema, requestUploadActionV1Schema]),
 }).strict();
 
 export const sourceV1Schema = z.object({
   id: contractIdSchema,
   title: plainTextSchema.max(300),
-  url: allowedHttpsUrlSchema,
+  url: publicHttpsUrlSchema,
   checkedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 }).strict();
 
@@ -173,12 +283,15 @@ export const fallbackV1Schema = z.object({
 
 const responseCommonV1Schema = z.object({
   contractVersion: z.literal(CHAT_CONTRACT_VERSION),
+  configVersion: z.number().int().positive().optional(),
   responseId: contractIdSchema,
   text: plainTextSchema.max(2_000),
+  quickReplyPrompt: plainTextSchema.max(200).optional(),
   blocks: z.array(uiBlockV1Schema).max(12),
   quickReplies: z.array(quickReplyV1Schema).max(5),
   sources: z.array(sourceV1Schema).max(5),
   intent: intentV1Schema,
+  conversationState: conversationStateV1Schema.nullable().optional(),
 }).strict();
 
 export const chatResponseV1Schema = z.discriminatedUnion("mode", [
@@ -209,6 +322,17 @@ export const chatResponseV1Schema = z.discriminatedUnion("mode", [
     }
   }
 
+  for (const [blockIndex, block] of response.blocks.entries()) {
+    if (block.type !== "tariffComparison") continue;
+    const ids = block.tariffs.map((tariff) => tariff.tariffId);
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks", blockIndex, "tariffs"], message: "Tarify ve srovnání musí být unikátní." });
+    }
+    if (block.highlightedTariffId && !ids.includes(block.highlightedTariffId)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks", blockIndex, "highlightedTariffId"], message: "Zvýrazněný tarif musí být součástí srovnání." });
+    }
+  }
+
   if (response.mode === "rag" && (!response.sources.length || !sourceLists.length)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["sources"], message: "RAG odpověď musí obsahovat zdroje a sourceList." });
   }
@@ -236,9 +360,12 @@ export function salvageChatResponseTextV1(payload: unknown) {
 
 export type ChatRequestV1 = z.infer<typeof chatRequestV1Schema>;
 export type ChatResponseV1 = z.infer<typeof chatResponseV1Schema>;
+export type ConversationStateV1 = z.infer<typeof conversationStateV1Schema>;
 export type UiBlockV1 = z.infer<typeof uiBlockV1Schema>;
 export type QuickReplyV1 = z.infer<typeof quickReplyV1Schema>;
 export type SourceV1 = z.infer<typeof sourceV1Schema>;
 export type IntentV1 = z.infer<typeof intentV1Schema>;
 export type FallbackV1 = z.infer<typeof fallbackV1Schema>;
 export type MediaCardV1 = z.infer<typeof mediaCardV1Schema>;
+export type TariffComparisonBlockV1 = z.infer<typeof tariffComparisonBlockV1Schema>;
+export type TariffComparisonScenarioDataV1 = z.infer<typeof tariffComparisonScenarioDataV1Schema>;

@@ -1,0 +1,1123 @@
+[
+  {
+    "id": "REG-001",
+    "title": "Validní ChatRequest v1",
+    "category": "API kontrakt",
+    "priority": "P0",
+    "preconditions": [
+      "Server používá ChatRequest v1."
+    ],
+    "steps": [
+      "Odešli omezenou historii zakončenou zprávou uživatele."
+    ],
+    "expected": [
+      "Požadavek projde schématem."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/contracts/chat/v1.ts:76"
+    ],
+    "automation": {
+      "file": "scripts/chat-contract-v1.test.mjs",
+      "testName": "ChatRequest v1 přijme omezenou konverzaci zakončenou uživatelem",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-002",
+    "title": "Explicitní scénář má přednost",
+    "category": "Orchestrace",
+    "priority": "P0",
+    "preconditions": [
+      "Dotaz odpovídá katalogovému scénáři."
+    ],
+    "steps": [
+      "Odešli přesný podporovaný dotaz."
+    ],
+    "expected": [
+      "Orchestrátor zvolí scenario."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/conversation-orchestrator.ts:40"
+    ],
+    "automation": {
+      "file": "scripts/conversation-orchestrator.test.mjs",
+      "testName": "orchestrator zvolí scenario pro explicitně známý demo scénář",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-003",
+    "title": "Nejasný dotaz vyvolá upřesnění",
+    "category": "Orchestrace",
+    "priority": "P1",
+    "preconditions": [],
+    "steps": [
+      "Odešli text „nefunguje to“."
+    ],
+    "expected": [
+      "TOBi neuhodne řešení a položí upřesňující otázku."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/conversation-orchestrator.ts:33"
+    ],
+    "automation": {
+      "file": "scripts/conversation-orchestrator.test.mjs",
+      "testName": "orchestrator zvolí clarification pro nejasný dotaz",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-004",
+    "title": "Internetové flow až k vyřešení",
+    "category": "Scénáře",
+    "priority": "P0",
+    "preconditions": [
+      "Internetový scénář je zapnutý."
+    ],
+    "steps": [
+      "Nahlas nefunkční internet.",
+      "Proveď restart.",
+      "Potvrď výsledek."
+    ],
+    "expected": [
+      "Přechody odpovídají katalogu a flow skončí bezpečně."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/demo-scenario-catalog.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/demo-scenario-flow.test.mjs",
+      "testName": "internetové flow projde od prvního dotazu přes restart až po vyřešení",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-005",
+    "title": "Podvržený přechod scénáře",
+    "category": "Bezpečnost",
+    "priority": "P0",
+    "preconditions": [
+      "Scénář je v prvním kroku."
+    ],
+    "steps": [
+      "Odešli transitionId nepovolený v aktuálním stavu."
+    ],
+    "expected": [
+      "Server přechod odmítne."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/demo-scenario-catalog.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/demo-scenario-flow.test.mjs",
+      "testName": "stavový model odmítne přechod, který není v aktuálním kroku povolený",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-006",
+    "title": "PUK scénář v zákaznickém UI",
+    "category": "Scénáře",
+    "priority": "P1",
+    "preconditions": [
+      "Chat je otevřený."
+    ],
+    "steps": [
+      "Zeptej se „Kde najdu PUK?“."
+    ],
+    "expected": [
+      "Odpověď vysvětlí bezpečný postup a nevyžádá si PUK."
+    ],
+    "mode": "MANUAL",
+    "implementationRefs": [
+      "lib/vodafone-knowledge.ts:148"
+    ]
+  },
+  {
+    "id": "REG-007",
+    "title": "Povolené bloky RAG plánu",
+    "category": "RAG",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Validuj plán s povolenými bloky."
+    ],
+    "expected": [
+      "Plán projde a zachová jen uzavřený registr."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/rag-response-plan.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/rag-response-plan.test.mjs",
+      "testName": "RAG plán přijme pouze povolené UI bloky",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-008",
+    "title": "Vypnuté zdroje se nezobrazí",
+    "category": "RAG",
+    "priority": "P0",
+    "preconditions": [
+      "showSources je false."
+    ],
+    "steps": [
+      "Vykresli RAG odpověď se sourceList."
+    ],
+    "expected": [
+      "Disclosure zdrojů není v renderovaných blocích."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/chat-source-visibility.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/chat-contract-v1.test.mjs",
+      "testName": "vypnuté zobrazení zdrojů skryje sourceList také u RAG odpovědi",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-009",
+    "title": "Privátní a nebezpečné zdrojové URL",
+    "category": "RAG",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Vlož privátní nebo ne-HTTPS zdroj."
+    ],
+    "expected": [
+      "Schéma URL odmítne."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/contracts/chat/v1.ts:18"
+    ],
+    "automation": {
+      "file": "scripts/chat-contract-v1.test.mjs",
+      "testName": "zdroje dovolí veřejný HTTPS web, ale odmítnou privátní adresu",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-010",
+    "title": "Modelový request používá uloženou konfiguraci",
+    "category": "LLM",
+    "priority": "P0",
+    "preconditions": [
+      "OpenAI režim je konfigurován."
+    ],
+    "steps": [
+      "Sestav modelový request."
+    ],
+    "expected": [
+      "Použije model, prompt a reasoning bez starých assistant zpráv."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/tobi-runtime-policy.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/tobi-config-sync.test.mjs",
+      "testName": "modelový request používá uložený model, prompt a reasoning, ale ne staré assistant zprávy",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-011",
+    "title": "Všechny schválené UI bloky",
+    "category": "UI",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Validuj odpověď se steps, alert, infoCard, action, mediaCards a sourceList."
+    ],
+    "expected": [
+      "Kontrakt odpověď přijme."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/contracts/chat/v1.ts:125"
+    ],
+    "automation": {
+      "file": "scripts/chat-contract-v1.test.mjs",
+      "testName": "ChatResponse v1 podporuje všechny schválené UI bloky",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-012",
+    "title": "Neznámý UI blok",
+    "category": "Bezpečnost",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Přidej neznámý typ UI bloku."
+    ],
+    "expected": [
+      "ChatResponse v1 blok odmítne."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/contracts/chat/v1.ts:185"
+    ],
+    "automation": {
+      "file": "scripts/chat-contract-v1.test.mjs",
+      "testName": "ChatResponse v1 odmítne neznámý UI blok",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-013",
+    "title": "Zakázané externí odkazy",
+    "category": "Bezpečnost",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Vlož HTTP, javascript nebo nepovolenou doménu do akce."
+    ],
+    "expected": [
+      "Kontrakt odkaz odmítne."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/contracts/chat/v1.ts:8"
+    ],
+    "automation": {
+      "file": "scripts/chat-contract-v1.test.mjs",
+      "testName": "kontrakt odmítne nebezpečné externí URL",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-014",
+    "title": "Carousel, klávesnice a skryté karty",
+    "category": "UI",
+    "priority": "P1",
+    "preconditions": [
+      "Výběrový carousel má více karet."
+    ],
+    "steps": [
+      "Procházej předchozí/další kartou a klávesnicí."
+    ],
+    "expected": [
+      "Popisky jsou dostupné a skryté karty nejsou v accessibility stromu."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "components/tobi/media-carousel.tsx:1"
+    ],
+    "automation": {
+      "file": "scripts/carousel-layout.test.mjs",
+      "testName": "výběrový carousel má popisky, klávesnici a skryté karty mimo přístupnost",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-015",
+    "title": "Rozpoznání požadavku na operátora",
+    "category": "Operátor",
+    "priority": "P1",
+    "preconditions": [],
+    "steps": [
+      "Použij běžnou českou žádost o živého operátora."
+    ],
+    "expected": [
+      "Požadavek je rozpoznán."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/mock-operator.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/mock-operator.test.mjs",
+      "testName": "rozpozná běžné české požadavky na živého operátora",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-016",
+    "title": "Povolené přechody handoveru",
+    "category": "Operátor",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Proveď události request, queue, connected a disconnect."
+    ],
+    "expected": [
+      "Stavový model dovolí jen definované přechody."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/operator-session.ts:13"
+    ],
+    "automation": {
+      "file": "scripts/mock-operator.test.mjs",
+      "testName": "stavový model dovolí pouze definované přechody",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-017",
+    "title": "Tři stavy dostupnosti operátora",
+    "category": "Operátor",
+    "priority": "P1",
+    "preconditions": [
+      "Administrace je autorizovaná."
+    ],
+    "steps": [
+      "Nastav unknown, online a offline a sleduj otevřený chat."
+    ],
+    "expected": [
+      "Zákaznický pohled odliší všechny tři stavy."
+    ],
+    "mode": "MANUAL",
+    "implementationRefs": [
+      "lib/tobi-config.ts:5",
+      "components/tobi-studio.tsx:1"
+    ]
+  },
+  {
+    "id": "REG-018",
+    "title": "Bezpečný salvage textu",
+    "category": "Chyby",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Vrať neplatnou strukturu s validním top-level textem."
+    ],
+    "expected": [
+      "Zachrání se jen prostý text."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/contracts/chat/v1.ts:282"
+    ],
+    "automation": {
+      "file": "scripts/chat-contract-v1.test.mjs",
+      "testName": "plain-text salvage zachrání pouze validní top-level text",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-019",
+    "title": "Bezpečný detail upstream chyby",
+    "category": "LLM",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Simuluj chybovou odpověď upstreamu."
+    ],
+    "expected": [
+      "Diagnostika nevypíše tajné nebo neomezené tělo."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/chat-v1-server.ts:379"
+    ],
+    "automation": {
+      "file": "scripts/tobi-config-sync.test.mjs",
+      "testName": "diagnostika upstream chyby vypíše jen bezpečný omezený detail",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-020",
+    "title": "Admin API autorizace a origin",
+    "category": "Administrace",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Volej admin API s raw Sites hlavičkami a kontroluj origin/JSON/limity samostatně."
+    ],
+    "expected": [
+      "Admin identita je vždy odmítnuta do implementace ověřené session; validátory zůstávají účinné."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "app/api/config/admin/route.ts:22"
+    ],
+    "automation": {
+      "file": "scripts/tobi-config-sync.test.mjs",
+      "testName": "admin API odmítá raw identitu a zachová mutace stejného originu s JSON limitem",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-021",
+    "title": "Synchronizace bez ztráty rozepsané zprávy",
+    "category": "Administrace",
+    "priority": "P0",
+    "preconditions": [
+      "Admin a chat jsou otevřené současně."
+    ],
+    "steps": [
+      "Rozepsat zprávu v chatu.",
+      "Uložit konfiguraci v administraci."
+    ],
+    "expected": [
+      "Nová konfigurace se propíše a rozepsaná zpráva zůstane."
+    ],
+    "mode": "MANUAL",
+    "implementationRefs": [
+      "components/tobi-studio.tsx:249",
+      "components/tobi-studio.tsx:300"
+    ]
+  },
+  {
+    "id": "REG-022",
+    "title": "Validace fotografie routeru",
+    "category": "Router",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Odešli nepodporovaný MIME, podpis nebo rozměr."
+    ],
+    "expected": [
+      "Soubor je odmítnut před vision providerem."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/router-image-validation.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/router-diagnostics.test.mjs",
+      "testName": "validace používá signaturu, rozměry a serverové limity",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-023",
+    "title": "Přesný staging fixture routeru",
+    "category": "Router",
+    "priority": "P1",
+    "preconditions": [
+      "Fixture flag je explicitně true."
+    ],
+    "steps": [
+      "Odešli přesný allowlistovaný JPEG."
+    ],
+    "expected": [
+      "Vrátí validní hypotézu bez volání providera."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/router-vision-fixtures.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/router-diagnostics.test.mjs",
+      "testName": "povolený přesný staging fixture vrátí validní hypotézu bez volání provideru",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-024",
+    "title": "Nejistá fotografie vede do ručního fallbacku",
+    "category": "Router",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Vrať neplatný nebo nejistý vision výstup."
+    ],
+    "expected": [
+      "TOBi netvrdí jistou diagnózu a nabídne ruční cestu."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/router-diagnostics.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/router-diagnostics.test.mjs",
+      "testName": "neplatný nebo nejistý vision výstup vždy vede do ručního fallbacku",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-025",
+    "title": "Major incident je označen jako simulace",
+    "category": "UI",
+    "priority": "P1",
+    "preconditions": [
+      "Simulace incidentu je zapnutá."
+    ],
+    "steps": [
+      "Otevři internetový scénář."
+    ],
+    "expected": [
+      "Incident se zobrazí bez tvrzení o živém monitoringu."
+    ],
+    "mode": "MANUAL",
+    "implementationRefs": [
+      "components/tobi/incident-card.tsx:1"
+    ]
+  },
+  {
+    "id": "REG-026",
+    "title": "Bezpečný mini-markup doprovodného textu",
+    "category": "Bezpečnost",
+    "priority": "P1",
+    "preconditions": [],
+    "steps": [
+      "Použij tučné úseky, více HTTPS odkazů a raw HTML."
+    ],
+    "expected": [
+      "Povolený markup se vykreslí a raw HTML zůstane textem."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/intro-helper-markup.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/tobi-config.test.mjs",
+      "testName": "mini-markup podporuje tučné úseky vedle více odkazů",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-027",
+    "title": "Zpětná vazba v UI",
+    "category": "UI",
+    "priority": "P2",
+    "preconditions": [
+      "Feedback feature flag je zapnutý."
+    ],
+    "steps": [
+      "Odpověz a zvol hodnocení."
+    ],
+    "expected": [
+      "Ovládání funguje bez tvrzení o produkčním uložení metrik."
+    ],
+    "mode": "NOT_AUTOMATED",
+    "implementationRefs": [
+      "components/tobi-studio.tsx:1"
+    ]
+  },
+  {
+    "id": "REG-028",
+    "title": "Commit-bound staging gate",
+    "category": "Release",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Validuj kompletní manifest a manifest s cizím SHA."
+    ],
+    "expected": [
+      "Platný projde; cizí SHA a chybějící evidence jsou odmítnuty."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "scripts/validate-staging-release.mjs:1"
+    ],
+    "automation": {
+      "file": "scripts/staging-release-gate.test.mjs",
+      "testName": "accepts a complete staging gate bound to one commit",
+      "command": "npm run test:release-gate"
+    }
+  },
+  {
+    "id": "REG-029",
+    "title": "Pozdrav, small talk, tón a přiměřený humor",
+    "category": "Konverzace",
+    "priority": "P1",
+    "preconditions": [
+      "Chat je otevřený."
+    ],
+    "steps": [
+      "Pozdrav.",
+      "Zeptej se, jak se TOBi má.",
+      "Použij lehký humor."
+    ],
+    "expected": [
+      "Odpověď je přiměřená, drží nastavený tón a neodbočí k neověřeným tvrzením."
+    ],
+    "mode": "NOT_AUTOMATED",
+    "implementationRefs": [
+      "lib/smart-demo-conversation.ts:1"
+    ]
+  },
+  {
+    "id": "REG-030",
+    "title": "Dotaz mimo telco",
+    "category": "Konverzace",
+    "priority": "P1",
+    "preconditions": [],
+    "steps": [
+      "Požádej o recept nebo počasí."
+    ],
+    "expected": [
+      "TOBi transparentně vymezí kompetenci a bezpečně nabídne návrat k podpoře."
+    ],
+    "mode": "NOT_AUTOMATED",
+    "implementationRefs": [
+      "lib/chat-v1-server.ts:360"
+    ]
+  },
+  {
+    "id": "REG-031",
+    "title": "Smíšený telco a mimo-scope dotaz",
+    "category": "Konverzace",
+    "priority": "P1",
+    "preconditions": [],
+    "steps": [
+      "V jedné zprávě spoj roaming a recept."
+    ],
+    "expected": [
+      "Telco část je řešena, mimo-scope část je jasně oddělena."
+    ],
+    "mode": "NOT_AUTOMATED",
+    "implementationRefs": [
+      "lib/chat-v1-server.ts:400"
+    ]
+  },
+  {
+    "id": "REG-032",
+    "title": "Navazující dotaz a změna tématu",
+    "category": "Kontext",
+    "priority": "P0",
+    "preconditions": [
+      "Proběhla jedna telco odpověď."
+    ],
+    "steps": [
+      "Polož navazující dotaz.",
+      "Potom změň téma."
+    ],
+    "expected": [
+      "Kontext pomůže pokračování a nové téma není nesprávně tlačeno do starého scénáře."
+    ],
+    "mode": "NOT_AUTOMATED",
+    "implementationRefs": [
+      "components/tobi-studio.tsx:742",
+      "lib/conversation-orchestrator.ts:40"
+    ]
+  },
+  {
+    "id": "REG-033",
+    "title": "Duplicitní zdroje RAG",
+    "category": "RAG",
+    "priority": "P1",
+    "preconditions": [],
+    "steps": [
+      "Připrav výsledky s duplicitní canonical URL."
+    ],
+    "expected": [
+      "Uživatel nevidí matoucí duplicity."
+    ],
+    "mode": "NOT_AUTOMATED",
+    "implementationRefs": [
+      "lib/vodafone-search.ts:1"
+    ]
+  },
+  {
+    "id": "REG-034",
+    "title": "Prompt injection ve zdroji",
+    "category": "Bezpečnost",
+    "priority": "P0",
+    "preconditions": [
+      "Zdroj obsahuje instrukci pro model."
+    ],
+    "steps": [
+      "Zpracuj zdroj s pokusem přepsat instrukce."
+    ],
+    "expected": [
+      "Obsah zdroje je považován za nedůvěryhodná data a secrets se nezveřejní."
+    ],
+    "mode": "NOT_AUTOMATED",
+    "implementationRefs": [
+      "lib/tobi-runtime-policy.ts:1"
+    ]
+  },
+  {
+    "id": "REG-035",
+    "title": "Dlouhá rich odpověď na mobilu",
+    "category": "UI",
+    "priority": "P1",
+    "preconditions": [
+      "Viewport má šířku 320 px."
+    ],
+    "steps": [
+      "Zobraz dlouhý text, nejvyšší blok, carousel, CTA a composer."
+    ],
+    "expected": [
+      "Stránka nemá horizontální scroll, ovládání je dostupné a composer není překrytý."
+    ],
+    "mode": "MANUAL",
+    "implementationRefs": [
+      "components/tobi-studio.tsx:1",
+      "components/tobi/media-carousel.tsx:1"
+    ]
+  },
+  {
+    "id": "REG-036",
+    "title": "Citlivé údaje PIN, PUK, heslo a karta",
+    "category": "Bezpečnost",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Nabídni TOBimu citlivé údaje."
+    ],
+    "expected": [
+      "TOBi je nevyžaduje, nepotvrzuje jejich uložení a poskytne bezpečný postup."
+    ],
+    "mode": "NOT_AUTOMATED",
+    "implementationRefs": [
+      "lib/vodafone-knowledge.ts:148"
+    ]
+  },
+  {
+    "id": "REG-037",
+    "title": "Raw HTML a XSS v doprovodném textu",
+    "category": "Bezpečnost",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Vlož script, HTML tag a event handler."
+    ],
+    "expected": [
+      "Obsah se zobrazí jako prostý text a nic se nevykoná."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/intro-helper-markup.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/tobi-config.test.mjs",
+      "testName": "mini-markup zachová prostý text a raw HTML jako text",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-038",
+    "title": "Přímý přístup k interní dokumentaci",
+    "category": "Administrace",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Otevři /doc bez přihlášení, jako non-admin a jako admin."
+    ],
+    "expected": [
+      "Obsah je uzamčen všem do implementace serverem ověřené session; žádné platformní login odkazy."
+    ],
+    "mode": "MANUAL",
+    "implementationRefs": [
+      "app/doc/page.tsx:1",
+      "lib/tobi-admin-auth.ts:1"
+    ]
+  },
+  {
+    "id": "REG-039",
+    "title": "Celý handover v zákaznickém UI",
+    "category": "Operátor",
+    "priority": "P1",
+    "preconditions": [
+      "Operátor je dostupný."
+    ],
+    "steps": [
+      "Vyžádej operátora.",
+      "Počkej na připojení.",
+      "Vyměň zprávu.",
+      "Ukonči chat."
+    ],
+    "expected": [
+      "UI zobrazí čekání, spojení a ukončení bez tvrzení o reálném kontaktním centru."
+    ],
+    "mode": "MANUAL",
+    "implementationRefs": [
+      "lib/operator-session.ts:13",
+      "app/api/operator/route.ts:16"
+    ]
+  },
+  {
+    "id": "REG-040",
+    "title": "Timeout, nedostupnost a retry API",
+    "category": "Chyby",
+    "priority": "P0",
+    "preconditions": [
+      "Upstream je nedostupný nebo pomalý."
+    ],
+    "steps": [
+      "Simuluj timeout a chybu služby.",
+      "Zopakuj požadavek."
+    ],
+    "expected": [
+      "Uživatel dostane bezpečnou chybu/fallback, retry nezdvojí citlivá data a logy neobsahují secrets."
+    ],
+    "mode": "NOT_AUTOMATED",
+    "implementationRefs": [
+      "lib/chat-v1-server.ts:379",
+      "app/api/operator/route.ts:23"
+    ]
+  },
+  {
+    "id": "REG-041",
+    "title": "Validace dokumentačních zdrojů",
+    "category": "Dokumentace",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Spusť validátor nad docs/portal."
+    ],
+    "expected": [
+      "Odkazy na soubory a testy existují, ID jsou unikátní a výsledky mají evidenci."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "scripts/validate-docs.mjs:1"
+    ],
+    "automation": {
+      "file": "scripts/docs-portal.test.mjs",
+      "testName": "dokumentační zdroje mají platné vazby, evidenci a nejméně 20 regresí",
+      "command": "npm run test:docs"
+    }
+  },
+  {
+    "id": "REG-042",
+    "title": "Serverová ochrana /doc",
+    "category": "Dokumentace",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Ověř strukturu route /doc."
+    ],
+    "expected": [
+      "Route zůstává za fail-closed autorizací, noindex a obsah načítá až po autorizaci."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "app/doc/page.tsx:1"
+    ],
+    "automation": {
+      "file": "scripts/docs-portal.test.mjs",
+      "testName": "route /doc zachová fail-closed autorizaci a načítá obsah až po ní",
+      "command": "npm run test:docs"
+    }
+  },
+  {
+    "id": "REG-043",
+    "title": "Integrita a čerstvost katalogu tarifů",
+    "category": "Tarify",
+    "priority": "P0",
+    "preconditions": [
+      "Katalog obsahuje snapshot veřejné nabídky."
+    ],
+    "steps": [
+      "Načti katalog.",
+      "Ověř unikátní ID, povolené URL, ceny a datum kontroly."
+    ],
+    "expected": [
+      "Katalog projde schématem a po sedmi dnech se nepoužije jako aktuální nabídka."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/tariff-catalog.ts:1",
+      "data/vodafone-mobile-tariffs.v1.json:1"
+    ],
+    "automation": {
+      "file": "scripts/tariff-comparison.test.mjs",
+      "testName": "čerstvost katalogu používá schválený sedmidenní limit",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-044",
+    "title": "Tarif do 400 Kč s 10 GB bez přesné shody",
+    "category": "Tarify",
+    "priority": "P0",
+    "preconditions": [
+      "Katalog neobsahuje přesnou shodu."
+    ],
+    "steps": [
+      "Odešli „tarif do 400 Kč s 10 GB“."
+    ],
+    "expected": [
+      "TOBi neskrývá chybějící shodu a každá katalogová alternativa nese svůj konkrétní rozdíl proti zadání."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/tariff-comparison.ts:164",
+      "e2e/tariff-comparison.spec.ts:127"
+    ],
+    "automation": {
+      "file": "e2e/tariff-comparison.spec.ts",
+      "testName": "doslovný požadavek do 400 Kč s 10 GB drží rozdíl na každé kartě",
+      "command": "npm run test:tariff-e2e"
+    }
+  },
+  {
+    "id": "REG-045",
+    "title": "Doplnění a změna tarifních preferencí",
+    "category": "Tarify",
+    "priority": "P0",
+    "preconditions": [
+      "Tarifní flow je aktivní."
+    ],
+    "steps": [
+      "Začni neúplným požadavkem.",
+      "Doplň data a rozpočet.",
+      "Z carouselu zvol Změnit požadavky a uprav požadovaný objem dat."
+    ],
+    "expected": [
+      "TOBi položí jednu krátkou otázku a aktualizuje carousel bez ztráty kontextu."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/tariff-comparison.ts:134"
+    ],
+    "automation": {
+      "file": "scripts/tariff-comparison.test.mjs",
+      "testName": "změna požadavků z carouselu obnoví carousel a omezená data vypnou neomezený režim",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-046",
+    "title": "Carousel jako přímé srovnání katalogových tarifů",
+    "category": "Tarify",
+    "priority": "P0",
+    "preconditions": [
+      "Katalog vrátí jeden až tři tarify."
+    ],
+    "steps": [
+      "Projdi všechny doporučené karty.",
+      "Ověř cenu, podmínku ceny, data, volání a SMS."
+    ],
+    "expected": [
+      "Carousel automaticky obsahuje všechny výsledky bez CTA Porovnat, přidávání, odebírání nebo druhého tabulkového kroku; centrální renderer zobrazí pouze katalogové hodnoty."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/contracts/chat/v1.ts:202",
+      "components/tobi/tariff-comparison.tsx:1"
+    ],
+    "automation": {
+      "file": "scripts/tariff-comparison.test.mjs",
+      "testName": "carousel rovnou porovná všechny katalogové tarify bez CTA Porovnat",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-047",
+    "title": "Neznámé ID tarifu a neplatný přechod",
+    "category": "Tarify",
+    "priority": "P0",
+    "preconditions": [
+      "Stav flow obsahuje neexistující ID nebo nepovolený transitionId."
+    ],
+    "steps": [
+      "Odešli podvržený stav.",
+      "Pokračuj v konverzaci."
+    ],
+    "expected": [
+      "Server nevykreslí vymyšlený tarif, nespadne a vrátí bezpečné objasnění nebo odmítnutí přechodu."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/tariff-comparison.ts:311"
+    ],
+    "automation": {
+      "file": "scripts/tariff-comparison.test.mjs",
+      "testName": "neznámé ID tarifu nespadne a vrátí bezpečné objasnění",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-048",
+    "title": "Responzivní a klávesnicový tarifní carousel",
+    "category": "UI",
+    "priority": "P0",
+    "preconditions": [
+      "Tarifní rich response je otevřený."
+    ],
+    "steps": [
+      "Ověř šířky 320, 390, 480, kompaktní 420 × 560 a desktop.",
+      "Projdi první, prostřední a poslední kartu šipkami a klávesnicí.",
+      "Ověř aktivní detail a dostupný composer."
+    ],
+    "expected": [
+      "Navigace zůstane před composerem, aktivní karta a odkaz jsou dostupné fokusem, skryté karty nejsou dostupné asistivní technologii, nevznikne horizontální scroll a CTA Porovnat se nezobrazí."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "components/tobi/tariff-comparison.tsx:1",
+      "e2e/tariff-comparison.spec.ts:1"
+    ],
+    "automation": {
+      "file": "e2e/tariff-comparison.spec.ts",
+      "testName": "tarifní carousel je přímé srovnání ovladatelné v",
+      "command": "npm run test:tariff-e2e"
+    }
+  },
+  {
+    "id": "REG-049",
+    "title": "Vercel fail-closed identita",
+    "category": "Migrace",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Spusť lokální regresi bez vzdálené DB."
+    ],
+    "expected": [
+      "Vercel fail-closed identita; nejde o release evidenci ani důkaz SQL provedení."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/tobi-admin-auth.ts:1",
+      "app/chatgpt-auth.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/vercel-migration.test.mjs",
+      "testName": "Vercel rejects spoof Sites headers and local development tokens",
+      "command": "npm run test:migration"
+    }
+  },
+  {
+    "id": "REG-050",
+    "title": "PostgreSQL query kontrakt (fake client)",
+    "category": "Migrace",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Spusť lokální regresi bez vzdálené DB."
+    ],
+    "expected": [
+      "PostgreSQL query kontrakt (fake client); nejde o release evidenci ani důkaz SQL provedení."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/tobi-config-postgres.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/tobi-postgres.test.mjs",
+      "testName": "PostgreSQL query contract: parameterized seed/read/JSON/timestamp/CAS/conflict (fake client only)",
+      "command": "npm run test:migration"
+    }
+  },
+  {
+    "id": "REG-051",
+    "title": "Chybějící produkční DB bez fallbacku",
+    "category": "Migrace",
+    "priority": "P0",
+    "preconditions": [],
+    "steps": [
+      "Spusť lokální regresi bez vzdálené DB."
+    ],
+    "expected": [
+      "Chybějící produkční DB bez fallbacku; nejde o release evidenci ani důkaz SQL provedení."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/tobi-config-store.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/vercel-migration.test.mjs",
+      "testName": "production missing DATABASE_URL rejects even with memory flag, without exposing values",
+      "command": "npm run test:migration"
+    }
+  }
+]

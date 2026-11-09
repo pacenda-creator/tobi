@@ -4,6 +4,7 @@ export const CHAT_BLOCK_TYPES_V1 = [
   "infoCard",
   "action",
   "mediaCards",
+  "tariffComparison",
   "sourceList",
 ] as const;
 

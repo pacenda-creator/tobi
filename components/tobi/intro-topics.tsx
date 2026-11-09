@@ -1,7 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, ChevronUp, KeyRound, ReceiptText, Router, Tv } from "lucide-react";
-import { useId, useState } from "react";
+import { ChevronRight, KeyRound, ReceiptText, Router, Tv } from "lucide-react";
 
 import type { IntroUseCase } from "@/lib/tobi-config";
 
@@ -9,19 +8,14 @@ const icons = { "key-round": KeyRound, router: Router, tv: Tv, "receipt-text": R
 
 export function IntroTopics({
   items,
-  initialVisibleCount = 3,
+  visibleCount = 3,
   onSelect,
 }: {
   items: IntroUseCase[];
-  initialVisibleCount?: number;
+  visibleCount?: number;
   onSelect: (prompt: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const extraTopicsId = useId();
-  const visibleCount = Math.max(0, initialVisibleCount);
-  const primaryItems = items.slice(0, visibleCount);
-  const extraItems = items.slice(visibleCount);
-  const hasMore = items.length > visibleCount;
+  const primaryItems = items.slice(0, Math.max(1, visibleCount));
 
   function renderTopic(item: IntroUseCase) {
     const Icon = icons[item.icon as keyof typeof icons] || Router;
@@ -29,6 +23,7 @@ export function IntroTopics({
       <button
         key={item.id}
         type="button"
+        data-tobi-focus-key={`intro-topic:${item.id}`}
         onClick={() => onSelect(item.prompt)}
         className="group flex min-h-12 w-full items-center gap-2.5 rounded-xl border border-[#dedede] bg-white px-3 py-1.5 text-left transition hover:border-[#c5c5c5] hover:bg-[#fafafa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]"
       >
@@ -45,19 +40,6 @@ export function IntroTopics({
     <section aria-label="Doporučená témata">
       {primaryItems.length ? <div className="grid gap-2">{primaryItems.map(renderTopic)}</div> : null}
 
-      {hasMore ? (
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls={extraTopicsId}
-          onClick={() => setExpanded((current) => !current)}
-          className="mt-1 flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#444] transition hover:bg-[#f5f5f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e60000]"
-        >
-          {expanded ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
-          {expanded ? "Méně možností" : "Další možnosti"}
-        </button>
-      ) : null}
-      {hasMore ? <div id={extraTopicsId} hidden={!expanded} className="mt-1 grid gap-2">{extraItems.map(renderTopic)}</div> : null}
     </section>
   );
 }

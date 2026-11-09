@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TOBi nové generace — Vodafone chatbot prototype",
-  description: "Interaktivní prototyp nové generace chatbota TOBi pro telco podporu.",
+  title: "TOBi — Vodafone online podpora",
+  description: "TOBi vám pomůže s internetem, službami a běžnými dotazy k Vodafonu.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

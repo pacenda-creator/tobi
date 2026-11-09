@@ -1,0 +1,43 @@
+[
+  {
+    "id": "message-flow",
+    "title": "Tok zákaznické zprávy",
+    "nodes": ["Zákaznické UI", "POST /api/chat/v1", "ChatRequest v1 + aktivní konfigurace", "Scénář / RAG / upřesnění", "ChatResponse v1 validace", "Centrální UI renderer"],
+    "connections": [
+      { "from": "Zákaznické UI", "to": "POST /api/chat/v1" },
+      { "from": "POST /api/chat/v1", "to": "ChatRequest v1 + aktivní konfigurace" },
+      { "from": "ChatRequest v1 + aktivní konfigurace", "to": "Scénář / RAG / upřesnění" },
+      { "from": "Scénář / RAG / upřesnění", "to": "ChatResponse v1 validace" },
+      { "from": "ChatResponse v1 validace", "to": "Centrální UI renderer" }
+    ],
+    "textAlternative": "Zákaznické UI odešle požadavek do chat API. Server validuje vstup a konfiguraci, zvolí scénář, RAG nebo upřesnění, validuje ChatResponse v1 a předá ho centrálnímu rendereru."
+  },
+  {
+    "id": "component-map",
+    "title": "Komponentový přehled",
+    "nodes": ["TobiStudio", "API routes", "Chat server a orchestrátor", "Lokální znalosti / OpenAI", "PostgreSQL konfigurace", "Chat block renderer"],
+    "connections": [
+      { "from": "TobiStudio", "to": "API routes", "label": "požadavek" },
+      { "from": "API routes", "to": "Chat server a orchestrátor" },
+      { "from": "Chat server a orchestrátor", "to": "Lokální znalosti / OpenAI", "label": "zvolí zdroj odpovědi" },
+      { "from": "Chat server a orchestrátor", "to": "PostgreSQL konfigurace", "label": "čte konfiguraci" },
+      { "from": "Chat server a orchestrátor", "to": "API routes", "label": "ChatResponse v1" },
+      { "from": "API routes", "to": "TobiStudio", "label": "odpověď" },
+      { "from": "TobiStudio", "to": "Chat block renderer", "label": "vykreslí bloky" }
+    ],
+    "textAlternative": "TobiStudio komunikuje s API routes. Chat server používá orchestrátor, lokální znalosti nebo OpenAI a čte konfiguraci z PostgreSQL. Výstup zobrazuje chat block renderer."
+  },
+  {
+    "id": "failure-flow",
+    "title": "Chyba a fallback",
+    "nodes": ["Upstream nebo validace selže", "Je dostupný validní prostý text?", "Bezpečný prostý text", "Pevný fallback", "Možnost opakovat nebo přejít na podporovanou cestu"],
+    "connections": [
+      { "from": "Upstream nebo validace selže", "to": "Je dostupný validní prostý text?" },
+      { "from": "Je dostupný validní prostý text?", "to": "Bezpečný prostý text", "label": "ano" },
+      { "from": "Je dostupný validní prostý text?", "to": "Pevný fallback", "label": "ne" },
+      { "from": "Bezpečný prostý text", "to": "Možnost opakovat nebo přejít na podporovanou cestu" },
+      { "from": "Pevný fallback", "to": "Možnost opakovat nebo přejít na podporovanou cestu" }
+    ],
+    "textAlternative": "Při chybě se použije pouze validní prostý text, jinak pevný fallback. Uživatel může požadavek opakovat nebo pokračovat podporovanou cestou."
+  }
+]

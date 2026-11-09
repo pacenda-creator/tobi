@@ -1,4 +1,4 @@
-import careIndex from "@/data/vodafone-care-index.json";
+import careIndex from "../data/vodafone-care-index.json" with { type: "json" };
 
 type IndexedPage = {
   url: string;
@@ -98,6 +98,8 @@ export type SearchResult = {
 export function searchVodafoneKnowledge(query: string, limit = 4): SearchResult[] {
   const queryNormalized = normalize(query);
   const queryTokens = tokens(query);
+  const asksForBusinessSupport = /\b(onenet|firem|firma|podnik|admin|uzivatel)\b/u.test(queryNormalized);
+  const asksForEnglish = /\b(english|anglicky|in english)\b/u.test(queryNormalized);
   if (!queryTokens.length) return [];
 
   const titleDocumentFrequency = new Map(
@@ -131,7 +133,8 @@ export function searchVodafoneKnowledge(query: string, limit = 4): SearchResult[
       score += pageCoverage * pageCoverage * 12;
       score += urlCoverage * urlCoverage * 12;
       if (titleCoverage === 1) score += 30;
-      if (page.url.includes("/pece/en/")) score *= 0.35;
+      if (page.url.includes("/pece/en/") && !asksForEnglish) score *= 0.2;
+      if (page.url.includes("/onenet/") && !asksForBusinessSupport) score *= 0.25;
       return { page, score };
     })
     .filter((item) => item.score >= Math.max(4, queryTokens.length * 2.2))

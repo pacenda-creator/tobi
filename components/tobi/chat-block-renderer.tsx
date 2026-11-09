@@ -5,6 +5,8 @@ import { ChevronDown, CircleHelp, ExternalLink } from "lucide-react";
 
 import { planChatBlockPresentationV1 } from "@/components/tobi/chat-block-presentation";
 import { MediaCarousel } from "@/components/tobi/media-carousel";
+import { TariffComparison } from "@/components/tobi/tariff-comparison";
+import { getVisibleChatSources } from "@/lib/chat-source-visibility";
 import type { ChatResponseV1, UiBlockV1 } from "@/lib/contracts/chat/v1";
 import type { RenderMode } from "@/lib/tobi-config";
 
@@ -20,7 +22,8 @@ type RenderContext = {
   loop: boolean;
   wideBreakpoint: number;
   busy: boolean;
-  onSendMessage: (message: string, label: string) => void;
+  onSendMessage: (message: string, label: string, transitionId?: string) => void;
+  onRequestUpload: () => void;
 };
 
 type BlockRenderer = (block: UiBlockV1, context: RenderContext) => ReactNode;
@@ -37,12 +40,22 @@ function AlertView({ block }: { block: AlertBlock }) {
   </div>;
 }
 
-function ActionView({ block, busy, onSendMessage }: { block: ActionBlock; busy: boolean; onSendMessage: (message: string, label: string) => void }) {
+function ActionView({ block, busy, onSendMessage, onRequestUpload }: { block: ActionBlock; busy: boolean; onSendMessage: (message: string, label: string, transitionId?: string) => void; onRequestUpload: () => void }) {
+  const appearance = block.appearance ?? "primary";
+  const className = appearance === "primary"
+    ? "mt-3 flex min-h-11 w-full items-center justify-center rounded-full bg-[#e60000] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#bd0000] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005fcc] disabled:cursor-not-allowed disabled:opacity-50"
+    : appearance === "toggle"
+      ? "mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-[#bbb] bg-white px-4 py-2.5 text-xs font-bold text-[#333] transition hover:border-[#e60000] hover:text-[#bd0000] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005fcc] disabled:cursor-not-allowed disabled:opacity-50"
+      : "mt-2 flex min-h-11 w-full items-center justify-center rounded-full border border-[#bbb] bg-white px-4 py-2.5 text-xs font-bold text-[#444] transition hover:border-[#777] hover:text-[#111] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005fcc] disabled:cursor-not-allowed disabled:opacity-50";
   if (block.action.kind === "openUrl") {
-    return <a href={block.action.url} target={block.action.external ? "_blank" : undefined} rel={block.action.external ? "noreferrer" : undefined} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#e60000] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#bd0000]">{block.label} {block.action.external ? <ExternalLink size={13} aria-hidden="true" /> : null}</a>;
+    return <a href={block.action.url} target={block.action.external ? "_blank" : undefined} rel={block.action.external ? "noreferrer" : undefined} className={`${className} gap-2`}>{block.label} {block.action.external ? <ExternalLink size={13} aria-hidden="true" /> : null}</a>;
+  }
+  if (block.action.kind === "requestUpload") {
+    return <button type="button" disabled={busy} onClick={onRequestUpload} className={className}>{block.label}</button>;
   }
   const message = block.action.message;
-  return <button type="button" disabled={busy} onClick={() => onSendMessage(message, block.label)} className="mt-3 flex min-h-11 w-full items-center justify-center rounded-full bg-[#e60000] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#bd0000] disabled:cursor-not-allowed disabled:opacity-50">{block.label}</button>;
+  const transitionId = block.action.transitionId;
+  return <button type="button" disabled={busy} onClick={() => onSendMessage(message, block.label, transitionId)} className={className}>{block.label}</button>;
 }
 
 export const CHAT_BLOCK_RENDERER_REGISTRY = {
@@ -56,7 +69,7 @@ export const CHAT_BLOCK_RENDERER_REGISTRY = {
       {context.companions.map((companion) => companion.type === "alert"
         ? <AlertView key={companion.id} block={companion} />
         : companion.type === "action"
-          ? <ActionView key={companion.id} block={companion} busy={context.busy} onSendMessage={context.onSendMessage} />
+          ? <ActionView key={companion.id} block={companion} busy={context.busy} onSendMessage={context.onSendMessage} onRequestUpload={context.onRequestUpload} />
           : null)}
     </section>;
   }) satisfies BlockRenderer,
@@ -68,7 +81,7 @@ export const CHAT_BLOCK_RENDERER_REGISTRY = {
     : null) satisfies BlockRenderer,
 
   action: ((block, context) => block.type === "action"
-    ? <ActionView block={block} busy={context.busy} onSendMessage={context.onSendMessage} />
+    ? <ActionView block={block} busy={context.busy} onSendMessage={context.onSendMessage} onRequestUpload={context.onRequestUpload} />
     : null) satisfies BlockRenderer,
 
   mediaCards: ((block, context) => block.type === "mediaCards"
@@ -83,7 +96,9 @@ export const CHAT_BLOCK_RENDERER_REGISTRY = {
           actionUrl: card.action?.action.kind === "openUrl" ? card.action.action.url : undefined,
           external: card.action?.action.kind === "openUrl" ? card.action.action.external : false,
           actionMessage: card.action?.action.kind === "sendMessage" ? card.action.action.message : undefined,
+          actionTransitionId: card.action?.action.kind === "sendMessage" ? card.action.action.transitionId : undefined,
         }))}
+        presentation={block.presentation}
         mode={context.renderMode}
         loop={context.loop}
         wideBreakpoint={context.wideBreakpoint}
@@ -92,11 +107,18 @@ export const CHAT_BLOCK_RENDERER_REGISTRY = {
       /></div>
     : null) satisfies BlockRenderer,
 
+  tariffComparison: ((block) => block.type === "tariffComparison"
+    ? <TariffComparison block={block} />
+    : null) satisfies BlockRenderer,
+
   sourceList: ((block, context) => {
     if (block.type !== "sourceList") return null;
-    if (context.response.mode !== "rag" && !context.showPresetSources) return null;
-    const visibleIds = new Set(context.sourceIds || block.sourceIds);
-    const sources = context.response.sources.filter((source) => visibleIds.has(source.id)).slice(0, 3);
+    const sources = getVisibleChatSources({
+      showSources: context.showPresetSources,
+      sources: context.response.sources,
+      blockSourceIds: block.sourceIds,
+      presentationSourceIds: context.sourceIds,
+    });
     if (!sources.length) return null;
     return <details className="group mt-2 text-[11px] text-[#777]"><summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-lg px-1 font-semibold hover:text-[#333]"><span>Zdroje · {sources.length}</span><ChevronDown size={13} className="transition group-open:rotate-180" /></summary><div className="mt-1 space-y-1 border-l border-[#ddd] pl-3">{sources.map((source) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 py-1 text-[#666] underline decoration-[#bbb] underline-offset-2 hover:text-[#222]"><span className="min-w-0 flex-1">{source.title}</span><ExternalLink size={11} className="shrink-0" aria-hidden="true" /></a>)}</div></details>;
   }) satisfies BlockRenderer,
@@ -110,10 +132,11 @@ type ChatBlockRendererProps = {
   loop: boolean;
   wideBreakpoint: number;
   busy: boolean;
-  onSendMessage: (message: string, label: string) => void;
+  onSendMessage: (message: string, label: string, transitionId?: string) => void;
+  onRequestUpload: () => void;
 };
 
-export function ChatBlockRenderer({ response, preferMedia, showPresetSources, renderMode, loop, wideBreakpoint, busy, onSendMessage }: ChatBlockRendererProps) {
+export function ChatBlockRenderer({ response, preferMedia, showPresetSources, renderMode, loop, wideBreakpoint, busy, onSendMessage, onRequestUpload }: ChatBlockRendererProps) {
   const units = useMemo(
     () => planChatBlockPresentationV1(response.blocks, response.intent.id, preferMedia),
     [preferMedia, response.blocks, response.intent.id],
@@ -131,6 +154,7 @@ export function ChatBlockRenderer({ response, preferMedia, showPresetSources, re
       wideBreakpoint,
       busy,
       onSendMessage,
+      onRequestUpload,
     })}</Fragment>;
   })}</>;
 }

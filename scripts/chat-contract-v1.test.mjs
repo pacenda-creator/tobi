@@ -10,6 +10,7 @@ import {
   CHAT_BLOCK_TYPES_V1,
   planChatBlockPresentationV1,
 } from "../components/tobi/chat-block-presentation.ts";
+import { getVisibleChatSources } from "../lib/chat-source-visibility.ts";
 
 const source = {
   id: "source-1",
@@ -46,6 +47,32 @@ test("ChatRequest v1 odmítne konverzaci nezakončenou uživatelem", () => {
   assert.equal(result.success, false);
 });
 
+test("ChatRequest v1 přijme explicitní stav scénáře a transitionId", () => {
+  const result = chatRequestV1Schema.safeParse({
+    contractVersion: "1",
+    messages: [{ role: "user", content: "Pevný internet stále nefunguje." }],
+    context: { locale: "cs-CZ", channel: "web" },
+    conversationState: {
+      scenarioId: "demo-internet",
+      stepId: "initial",
+      choices: [],
+      allowedTransitionIds: ["internet-resolved", "internet-not-resolved"],
+    },
+    transitionId: "internet-not-resolved",
+  });
+  assert.equal(result.success, true);
+});
+
+test("ChatRequest v1 odmítne transitionId bez aktivního stavu", () => {
+  const result = chatRequestV1Schema.safeParse({
+    contractVersion: "1",
+    messages: [{ role: "user", content: "Pokračovat." }],
+    context: { locale: "cs-CZ", channel: "web" },
+    transitionId: "internet-not-resolved",
+  });
+  assert.equal(result.success, false);
+});
+
 test("ChatResponse v1 podporuje všechny schválené UI bloky", () => {
   const result = chatResponseV1Schema.safeParse({
     ...baseResponse,
@@ -71,10 +98,70 @@ test("ChatResponse v1 podporuje všechny schválené UI bloky", () => {
           },
         }],
       },
+      {
+        type: "tariffComparison",
+        id: "tariffs-1",
+        title: "Srovnání tarifů",
+        catalogVersion: "catalog-1",
+        checkedAt: "2026-11-08",
+        highlightedTariffId: "tariff-a",
+        tariffs: [
+          { tariffId: "tariff-a", name: "Tarif A", monthlyPriceCzk: 497, listPriceCzk: 699, priceCondition: "Samostatný tarif.", data: { kind: "limited", gb: 12 }, calls: "unlimited", sms: "unlimited", commitment: "none", detailUrl: "https://www.vodafone.cz/tarify/slimitem-m/" },
+          { tariffId: "tariff-b", name: "Tarif B", monthlyPriceCzk: 576, priceCondition: "Samostatný tarif.", data: { kind: "unlimited", speedMbps: 8 }, calls: "unlimited", sms: "unlimited", commitment: "none", detailUrl: "https://www.vodafone.cz/tarify/bezlimitu-m/" },
+        ],
+      },
       { type: "sourceList", id: "sources-1", sourceIds: ["source-1"] },
     ],
   });
   assert.equal(result.success, true);
+});
+
+test("selection mediaCards podporují sedm modelů a nejvýše osm karet", () => {
+  const selectionCard = (index) => ({
+    id: `router-card-${index}`,
+    title: `Modem ${index}`,
+    description: "Kabelový modem",
+    image: { src: `/tobi/routers/router-${index}.png`, alt: `Modem ${index}` },
+    action: {
+      label: "To je můj modem",
+      action: { kind: "sendMessage", message: `Mám modem ${index}.`, transitionId: `router-model-${index}` },
+    },
+  });
+  const responseWithCards = (count) => chatResponseV1Schema.safeParse({
+    ...baseResponse,
+    mode: "preset",
+    fallback: null,
+    sources: [],
+    blocks: [{
+      type: "mediaCards",
+      id: "router-selection",
+      presentation: "selection",
+      cards: Array.from({ length: count }, (_, index) => selectionCard(index + 1)),
+    }],
+  });
+
+  assert.equal(responseWithCards(7).success, true);
+  assert.equal(responseWithCards(8).success, true);
+  assert.equal(responseWithCards(9).success, false);
+});
+
+test("upload lze vyžádat pouze uzavřenou katalogovou akcí", () => {
+  const valid = chatResponseV1Schema.safeParse({
+    ...baseResponse,
+    mode: "preset",
+    fallback: null,
+    sources: [],
+    blocks: [{ type: "action", id: "upload", label: "Přiložit router", action: { kind: "requestUpload", purpose: "router-diagnostics-v1" } }],
+  });
+  const invalid = chatResponseV1Schema.safeParse({
+    ...baseResponse,
+    mode: "preset",
+    fallback: null,
+    sources: [],
+    blocks: [{ type: "action", id: "upload", label: "Přiložit soubor", action: { kind: "requestUpload", purpose: "arbitrary-upload" } }],
+  });
+  assert.equal(valid.success, true);
+  assert.equal(invalid.success, false);
 });
 
 test("RAG vyžaduje canonical zdroj i sourceList", () => {
@@ -86,6 +173,37 @@ test("RAG vyžaduje canonical zdroj i sourceList", () => {
     blocks: [],
   });
   assert.equal(result.success, false);
+});
+
+test("vypnuté zobrazení zdrojů skryje sourceList také u RAG odpovědi", () => {
+  const ragResponse = chatResponseV1Schema.parse({
+    ...baseResponse,
+    mode: "rag",
+    fallback: null,
+    sources: [source],
+    blocks: [{ type: "sourceList", id: "sources-1", sourceIds: [source.id] }],
+  });
+  const sourceList = ragResponse.blocks.find((block) => block.type === "sourceList");
+  assert.ok(sourceList);
+
+  assert.deepEqual(getVisibleChatSources({
+    showSources: false,
+    sources: ragResponse.sources,
+    blockSourceIds: sourceList.sourceIds,
+  }), []);
+
+  assert.deepEqual(getVisibleChatSources({
+    showSources: true,
+    sources: ragResponse.sources,
+    blockSourceIds: sourceList.sourceIds,
+  }), [source]);
+
+  assert.deepEqual(getVisibleChatSources({
+    showSources: true,
+    sources: ragResponse.sources,
+    blockSourceIds: sourceList.sourceIds,
+    presentationSourceIds: ["missing-source"],
+  }), []);
 });
 
 test("sourceList odmítne referenci na neexistující zdroj", () => {
@@ -119,6 +237,25 @@ test("kontrakt odmítne nebezpečné externí URL", () => {
     blocks: [{ type: "action", id: "action-1", label: "Pokračovat", action: { kind: "openUrl", url: "javascript:alert(1)", external: true } }],
   });
   assert.equal(result.success, false);
+});
+
+test("zdroje dovolí veřejný HTTPS web, ale odmítnou privátní adresu", () => {
+  const publicResult = chatResponseV1Schema.safeParse({
+    ...baseResponse,
+    mode: "rag",
+    fallback: null,
+    sources: [{ ...source, url: "https://support.apple.com/cs-cz/guide/iphone/welcome/ios" }],
+    blocks: [{ type: "sourceList", id: "sources-1", sourceIds: ["source-1"] }],
+  });
+  const privateResult = chatResponseV1Schema.safeParse({
+    ...baseResponse,
+    mode: "rag",
+    fallback: null,
+    sources: [{ ...source, url: "https://127.0.0.1/internal" }],
+    blocks: [{ type: "sourceList", id: "sources-1", sourceIds: ["source-1"] }],
+  });
+  assert.equal(publicResult.success, true);
+  assert.equal(privateResult.success, false);
 });
 
 test("ChatResponse v1 odmítne neznámý UI blok", () => {
@@ -201,7 +338,7 @@ test("kontrakt odmítne duplicitní ID bloků", () => {
 });
 
 test("registry coverage obsahuje každý ChatResponse v1 block právě jednou", () => {
-  assert.deepEqual(CHAT_BLOCK_TYPES_V1, ["steps", "alert", "infoCard", "action", "mediaCards", "sourceList"]);
+  assert.deepEqual(CHAT_BLOCK_TYPES_V1, ["steps", "alert", "infoCard", "action", "mediaCards", "tariffComparison", "sourceList"]);
   assert.equal(new Set(CHAT_BLOCK_TYPES_V1).size, CHAT_BLOCK_TYPES_V1.length);
 });
 

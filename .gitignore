@@ -19,6 +19,8 @@ next-env.d.ts
 
 # Test output
 /coverage/
+/.playwright-results/
+/artifacts/tariff-comparison/
 
 # Package-manager logs
 npm-debug.log*
@@ -28,6 +30,7 @@ yarn-error.log*
 
 # Local environment and keys
 .env*
+!/.env.example
 .dev.vars*
 *.pem
 

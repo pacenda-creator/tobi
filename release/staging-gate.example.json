@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "environment": "example-only",
+  "commit": "0000000000000000000000000000000000000000",
+  "candidateCreatedAt": "2026-11-07T00:00:00.000Z",
+  "developer": {
+    "status": "PENDING",
+    "commit": "0000000000000000000000000000000000000000",
+    "completedAt": null,
+    "actor": "",
+    "evidence": ""
+  },
+  "checks": [],
+  "reviews": {
+    "architecture": { "required": false, "status": "PENDING", "commit": "0000000000000000000000000000000000000000", "completedAt": null, "actor": "", "evidence": "" },
+    "ux": { "required": false, "status": "PENDING", "commit": "0000000000000000000000000000000000000000", "completedAt": null, "actor": "", "evidence": "" }
+  },
+  "documentation": {
+    "status": "PENDING",
+    "commit": "0000000000000000000000000000000000000000",
+    "completedAt": null,
+    "actor": "",
+    "evidence": ""
+  },
+  "qa": {
+    "decision": "PENDING",
+    "commit": "0000000000000000000000000000000000000000",
+    "completedAt": null,
+    "actor": "",
+    "evidence": ""
+  },
+  "openCriticalDefects": 1,
+  "deploymentPrerequisites": {
+    "status": "BLOCKED",
+    "target": "staging",
+    "url": "",
+    "mechanism": "",
+    "ciIdentity": "",
+    "rollback": "",
+    "smokeAuth": "",
+    "verifiedAt": null,
+    "evidence": ""
+  }
+}

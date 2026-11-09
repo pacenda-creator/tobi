@@ -1,0 +1,429 @@
+[
+  {
+    "id": "FEAT-001",
+    "name": "Zákaznický chat",
+    "scenario": "Zákazník otevře / nebo /chat a položí dotaz.",
+    "behavior": "Responzivní widget drží lokální historii a vykresluje validované odpovědi.",
+    "entryPoints": [
+      "app/page.tsx:12",
+      "app/chat/page.tsx:12"
+    ],
+    "dependencies": [
+      "TobiStudio",
+      "veřejná konfigurace"
+    ],
+    "status": "IMPLEMENTED",
+    "configRefs": [
+      "lib/tobi-config.ts:38"
+    ],
+    "sourceRefs": [
+      "components/tobi-studio.tsx:742"
+    ],
+    "testCaseIds": [
+      "REG-001",
+      "REG-014"
+    ]
+  },
+  {
+    "id": "FEAT-002",
+    "name": "ChatRequest / ChatResponse v1",
+    "scenario": "Klient odešle omezenou historii a přijme strukturovanou odpověď.",
+    "behavior": "Zod kontrakt omezuje zprávy, stav, UI bloky, odkazy a zdroje.",
+    "entryPoints": [
+      "POST /api/chat/v1"
+    ],
+    "dependencies": [
+      "zod"
+    ],
+    "status": "IMPLEMENTED",
+    "configRefs": [],
+    "sourceRefs": [
+      "lib/contracts/chat/v1.ts:76",
+      "lib/contracts/chat/v1.ts:237"
+    ],
+    "testCaseIds": [
+      "REG-005",
+      "REG-013",
+      "REG-018"
+    ]
+  },
+  {
+    "id": "FEAT-003",
+    "name": "Konverzační orchestrace",
+    "scenario": "Dotaz je explicitní scénář, volný dotaz nebo nejasný vstup.",
+    "behavior": "Server rozhoduje mezi scenario, rag a clarification; pokračování flow vyžaduje explicitní stav.",
+    "entryPoints": [
+      "lib/conversation-orchestrator.mts"
+    ],
+    "dependencies": [
+      "ChatRequest v1",
+      "katalog scénářů"
+    ],
+    "status": "IMPLEMENTED",
+    "configRefs": [],
+    "sourceRefs": [
+      "lib/conversation-orchestrator.ts:40"
+    ],
+    "testCaseIds": [
+      "REG-002",
+      "REG-003",
+      "REG-004"
+    ]
+  },
+  {
+    "id": "FEAT-004",
+    "name": "Přednastavené telco znalosti",
+    "scenario": "Dotaz na PUK, pevný internet, roaming nebo platby odpovídá lokální kartě; Vodafone TV pokračuje obecnou retrieval cestou.",
+    "behavior": "Kurátorované odpovědi poskytují kroky, bezpečné akce a ověřený veřejný zdroj jen pro skutečně katalogové oblasti.",
+    "entryPoints": [
+      "lib/vodafone-knowledge.ts"
+    ],
+    "dependencies": [
+      "lokální katalog"
+    ],
+    "status": "IMPLEMENTED",
+    "configRefs": [
+      "lib/tobi-config.ts:163"
+    ],
+    "sourceRefs": [
+      "lib/vodafone-knowledge.ts:51",
+      "lib/vodafone-knowledge.ts:114",
+      "lib/vodafone-knowledge.ts:130",
+      "lib/vodafone-knowledge.ts:148"
+    ],
+    "testCaseIds": [
+      "REG-004",
+      "REG-006"
+    ]
+  },
+  {
+    "id": "FEAT-005",
+    "name": "RAG nad Centrem péče",
+    "scenario": "Volný konkrétní telco dotaz vyhledá relevantní veřejné články.",
+    "behavior": "Lokální index poskytne omezený kontext; zdroje se validují a mohou být v konfiguraci skryté.",
+    "entryPoints": [
+      "lib/vodafone-search.ts",
+      "data/vodafone-care-index.json"
+    ],
+    "dependencies": [
+      "lokální index",
+      "runtime policy"
+    ],
+    "status": "IMPLEMENTED",
+    "configRefs": [
+      "features.sources"
+    ],
+    "sourceRefs": [
+      "lib/chat-v1-server.ts:400",
+      "lib/rag-response-plan.ts:1"
+    ],
+    "testCaseIds": [
+      "REG-007",
+      "REG-008",
+      "REG-009"
+    ]
+  },
+  {
+    "id": "FEAT-006",
+    "name": "OpenAI odpovědi",
+    "scenario": "Je-li dostupný serverový API klíč, volný dotaz používá Responses API.",
+    "behavior": "Model, prompt a parametry vychází z interní konfigurace; výstup se validuje.",
+    "entryPoints": [
+      "lib/chat-v1-server.ts"
+    ],
+    "dependencies": [
+      "OPENAI_API_KEY",
+      "OpenAI Responses API"
+    ],
+    "status": "PARTIAL",
+    "configRefs": [
+      "runtime.model",
+      "runtime.systemPrompt"
+    ],
+    "sourceRefs": [
+      "lib/chat-v1-server.ts:379",
+      "lib/tobi-runtime-policy.ts:1"
+    ],
+    "testCaseIds": [
+      "REG-010",
+      "REG-019"
+    ]
+  },
+  {
+    "id": "FEAT-007",
+    "name": "Strukturované UI bloky",
+    "scenario": "Odpověď obsahuje kroky, upozornění, kartu, akci, carousel, srovnání tarifů nebo zdroje.",
+    "behavior": "Centrální renderer podporuje jen uzavřený registr ChatResponse v1; tarifní hodnoty přebírá z validovaného serverového katalogu.",
+    "entryPoints": [
+      "components/tobi/chat-block-renderer.tsx"
+    ],
+    "dependencies": [
+      "ChatResponse v1"
+    ],
+    "status": "IMPLEMENTED",
+    "configRefs": [
+      "features.mediaCards",
+      "presentation.renderMode"
+    ],
+    "sourceRefs": [
+      "components/tobi/chat-block-renderer.tsx:1",
+      "lib/contracts/chat/v1.ts:202"
+    ],
+    "testCaseIds": [
+      "REG-011",
+      "REG-012",
+      "REG-013",
+      "REG-014",
+      "REG-046"
+    ]
+  },
+  {
+    "id": "FEAT-008",
+    "name": "Administrace konfigurace",
+    "scenario": "Oprávněný správce mění konfiguraci a bezpečně ji uloží.",
+    "behavior": "Interní přístup je fail-closed BLOCKED do implementace schválené serverem ověřené identity/session; raw Sites hlavičky, localhost ani vývojové tokeny neopravňují k přístupu. Validátory API zůstávají zachovány.",
+    "entryPoints": [
+      "/admin",
+      "GET/PUT /api/config/admin"
+    ],
+    "dependencies": [
+      "serverem ověřená session — BLOCKED"
+    ],
+    "status": "PARTIAL",
+    "configRefs": [],
+    "sourceRefs": [
+      "app/admin/page.tsx:21",
+      "app/api/config/admin/route.ts:22",
+      "lib/tobi-config-postgres.ts:1",
+      "lib/tobi-config-store.ts:1",
+      "supabase/migrations/20261109000000_tobi_configurations.sql:1",
+      "docs/vercel-supabase.md:1"
+    ],
+    "testCaseIds": [
+      "REG-020",
+      "REG-021",
+      "REG-049",
+      "REG-050",
+      "REG-051"
+    ]
+  },
+  {
+    "id": "FEAT-009",
+    "name": "Okamžitá synchronizace konfigurace",
+    "scenario": "Otevřený zákaznický chat převezme novější uloženou konfiguraci.",
+    "behavior": "Klient používá ETag polling přibližně po sekundě a BroadcastChannel na stejném zařízení.",
+    "entryPoints": [
+      "GET /api/config/public"
+    ],
+    "dependencies": [
+      "configVersion",
+      "BroadcastChannel"
+    ],
+    "status": "IMPLEMENTED",
+    "configRefs": [],
+    "sourceRefs": [
+      "components/tobi-studio.tsx:249",
+      "components/tobi-studio.tsx:300"
+    ],
+    "testCaseIds": [
+      "REG-021"
+    ]
+  },
+  {
+    "id": "FEAT-010",
+    "name": "Dostupnost operátora a handover",
+    "scenario": "Zákazník požádá o operátora a projde simulovaným čekáním/připojením.",
+    "behavior": "Stavový model rozlišuje neznámou, online a offline dostupnost; operátor je mock, ne live kontaktní centrum.",
+    "entryPoints": [
+      "POST /api/operator"
+    ],
+    "dependencies": [
+      "mock operator",
+      "runtime state"
+    ],
+    "status": "DEMO",
+    "configRefs": [
+      "operatorAvailability"
+    ],
+    "sourceRefs": [
+      "lib/operator-session.ts:13",
+      "app/api/operator/route.ts:16"
+    ],
+    "testCaseIds": [
+      "REG-015",
+      "REG-016",
+      "REG-017"
+    ]
+  },
+  {
+    "id": "FEAT-011",
+    "name": "Diagnostika routeru z fotografie",
+    "scenario": "Internetové flow umožní explicitně přiložit fotografii a potvrdit hypotézu.",
+    "behavior": "Server validuje MIME, signaturu, velikost a rozměry; výstup vision je omezen katalogem modelů a kroky vyžadují potvrzení.",
+    "entryPoints": [
+      "POST /api/router-diagnostics/v1/analyze"
+    ],
+    "dependencies": [
+      "OpenAI vision nebo přesný staging fixture"
+    ],
+    "status": "DEMO",
+    "configRefs": [
+      "features.routerPhotoDiagnostics"
+    ],
+    "sourceRefs": [
+      "lib/router-diagnostics-server.ts:1",
+      "lib/router-image-validation.ts:1"
+    ],
+    "testCaseIds": [
+      "REG-022",
+      "REG-023",
+      "REG-024"
+    ]
+  },
+  {
+    "id": "FEAT-012",
+    "name": "Major incident simulace",
+    "scenario": "Náhled může zobrazit globální incident pevného internetu.",
+    "behavior": "Jde o konfigurovatelnou simulaci prototypu, nikoli live monitoring sítě.",
+    "entryPoints": [
+      "administrace TOBi"
+    ],
+    "dependencies": [
+      "incident config"
+    ],
+    "status": "DEMO",
+    "configRefs": [
+      "features.majorIncident"
+    ],
+    "sourceRefs": [
+      "lib/tobi-config.ts:217",
+      "components/tobi/incident-card.tsx:1"
+    ],
+    "testCaseIds": [
+      "REG-025"
+    ]
+  },
+  {
+    "id": "FEAT-013",
+    "name": "Bezpečný doprovodný text",
+    "scenario": "Správce vloží prostý text, více HTTPS odkazů, tučné úseky a zalomení.",
+    "behavior": "Omezený mini-markup zachová raw HTML jako text a odmítne nebezpečné odkazy.",
+    "entryPoints": [
+      "nastavení úvodu v administraci"
+    ],
+    "dependencies": [
+      "intro helper parser"
+    ],
+    "status": "IMPLEMENTED",
+    "configRefs": [
+      "presentation.intro.helperText"
+    ],
+    "sourceRefs": [
+      "lib/intro-helper-markup.ts:1"
+    ],
+    "testCaseIds": [
+      "REG-026"
+    ]
+  },
+  {
+    "id": "FEAT-014",
+    "name": "Zpětná vazba",
+    "scenario": "Uživatel může hodnotit užitečnost odpovědi, je-li funkce zapnutá.",
+    "behavior": "UI zpětné vazby je lokální prezentační prvek; repository nepotvrzuje produkční ukládání metrik.",
+    "entryPoints": [
+      "zákaznický chat"
+    ],
+    "dependencies": [
+      "feature flag"
+    ],
+    "status": "PARTIAL",
+    "configRefs": [
+      "features.feedback"
+    ],
+    "sourceRefs": [
+      "components/tobi-studio.tsx:1"
+    ],
+    "testCaseIds": [
+      "REG-027"
+    ]
+  },
+  {
+    "id": "FEAT-015",
+    "name": "Staging release gate",
+    "scenario": "Release manifest pro konkrétní commit se ověří před stagingem.",
+    "behavior": "Validátor kontroluje povinné evidence a blokující stavy; deployment nespouští.",
+    "entryPoints": [
+      "npm run release:validate"
+    ],
+    "dependencies": [
+      "commit-bound manifest"
+    ],
+    "status": "PARTIAL",
+    "configRefs": [],
+    "sourceRefs": [
+      "scripts/validate-staging-release.mjs:1",
+      "docs/staging-release-process.md:1"
+    ],
+    "testCaseIds": [
+      "REG-028"
+    ]
+  },
+  {
+    "id": "FEAT-016",
+    "name": "Interní dokumentační portál",
+    "scenario": "Oprávněný správce otevře /doc a dohledá funkci, architekturu nebo regresní případ.",
+    "behavior": "Interní přístup je fail-closed BLOCKED do implementace schválené serverem ověřené identity/session; raw Sites hlavičky, localhost ani vývojové tokeny neopravňují k přístupu. Validátory API zůstávají zachovány.",
+    "entryPoints": [
+      "/doc",
+      "npm run docs:validate"
+    ],
+    "dependencies": [
+      "serverem ověřená session — BLOCKED"
+    ],
+    "status": "PARTIAL",
+    "configRefs": [],
+    "sourceRefs": [
+      "app/doc/page.tsx:1",
+      "components/tobi-docs/doc-portal.tsx:1",
+      "scripts/validate-docs.mjs:1"
+    ],
+    "testCaseIds": [
+      "REG-038",
+      "REG-041",
+      "REG-042"
+    ]
+  },
+  {
+    "id": "FEAT-017",
+    "name": "Konverzační srovnání mobilních tarifů",
+    "scenario": "Zákazník popíše požadovaná data a rozpočet a projde 1–3 doporučené nabídky v jednokartovém carouselu.",
+    "behavior": "Deterministický serverový flow vybírá pouze ID z verzovaného katalogu, zachovává preference a zobrazuje cenu včetně relevantní podmínky, data, volání a SMS přes validovaný tariffComparison blok. Carousel je přímé srovnání všech doporučených tarifů bez samostatného CTA Porovnat, přidávání, odebírání nebo druhého tabulkového kroku; při nulové shodě ukazuje rozdíl na každé kartě. Starý katalog ceny nezobrazí a prototyp tarif neobjednává.",
+    "entryPoints": [
+      "POST /api/chat/v1",
+      "Porovnat mobilní tarify"
+    ],
+    "dependencies": [
+      "ChatResponse v1",
+      "verzovaný katalog Vodafone.cz",
+      "centrální UI renderer"
+    ],
+    "status": "DEMO",
+    "configRefs": [
+      "topics.tariff"
+    ],
+    "sourceRefs": [
+      "lib/tariff-comparison.ts:1",
+      "lib/tariff-catalog.ts:1",
+      "data/vodafone-mobile-tariffs.v1.json:1",
+      "components/tobi/tariff-comparison.tsx:1"
+    ],
+    "testCaseIds": [
+      "REG-043",
+      "REG-044",
+      "REG-045",
+      "REG-046",
+      "REG-047",
+      "REG-048"
+    ]
+  }
+]
