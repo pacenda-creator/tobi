@@ -57,12 +57,12 @@
     "scripts/validate-docs.mjs": "fd4a31a7b761416bdd9e255f9f7cf45a3df9cd4fedb78ec4c0969ecaa8a97e24",
     "scripts/validate-staging-release.mjs": "7aac98bd964e5949f303f3e433e769e770a07359db222a6d1fc08981ca8cb54b",
     "lib/conversation-orchestrator.ts": "764a4e5577676337165c012194df2550d3bf6e5db3b2c92c1e3fb90d946f3643",
-    "lib/tobi-config-postgres.ts": "58ffb71eadf3a3c975eebbafa24fbcee53800e39efe3f18ce6d5edf3f5c9eb38",
+    "lib/tobi-config-postgres.ts": "dbd9869019a83ccca3ecf0c0016d533063bb724be5427af77bee8983b93714b1",
     "lib/tobi-config-store.ts": "d02ff56860af453d40d3d681cc0471bab87dc5a885e609120bba9c7807719fa7",
     "supabase/migrations/20261109000000_tobi_configurations.sql": "4e8a54e6109ee86165fdf14bbe1c166bf230b65f55021974987a4969e8437f59",
-    "docs/vercel-supabase.md": "37b940ebfa029e6874152072390e187d902f6ee69403ec05a21ba64486ca63de",
-    "scripts/vercel-migration.test.mjs": "78e1aae573fedfbca1f6e05292bbfcdb9b1f7ae31f6510e30b5834164f0750c3",
-    "scripts/tobi-postgres.test.mjs": "b5cd87ece6eb723247217fb5cd1884fb7e56dbf781ac72f149fd84de8ee0a6b8",
+    "docs/vercel-supabase.md": "9f25453fbc5361a3510cefb2ead3ee79ff19840769277e76f1ba83dd5fef5792",
+    "scripts/vercel-migration.test.mjs": "11a72c9d4db9b1f9264fd1d9f4a98a505ea7af3482b6b4b8c36f7e1228317034",
+    "scripts/tobi-postgres.test.mjs": "0db496bd64f3fb7171dae1f6c15834bc9d5d7f6ac75f3269574362e43a0f2621",
     "app/chatgpt-auth.ts": "d0ac25b16b1bd310db9a71c2180665789d8cc4eeeac818127aa1f21b94b7489c"
   }
 }

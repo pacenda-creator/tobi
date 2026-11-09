@@ -21,6 +21,7 @@
     "test:release-gate": "node --test scripts/staging-release-gate.test.mjs",
     "release:validate": "node scripts/validate-staging-release.mjs",
     "db:generate": "drizzle-kit generate",
+    "test:postgres-tls": "node --experimental-strip-types --test --test-isolation=none scripts/tobi-postgres-tls.test.mjs",
     "test:migration": "node --experimental-strip-types --test --test-isolation=none scripts/vercel-migration.test.mjs scripts/tobi-postgres.test.mjs"
   },
   "dependencies": {

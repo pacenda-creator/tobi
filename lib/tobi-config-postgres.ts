@@ -1,3 +1,4 @@
+import { X509Certificate } from "node:crypto";
 import type { TobiConfigRepository, TobiConfigRow } from "./tobi-config-repository.ts";
 
 type PostgresFailurePhase = "initialization" | "provider" | "query" | "idle_pool";
@@ -5,7 +6,8 @@ const failureCodes = new Map<string, string>([
   ["28P01", "authentication"], ["42501", "permission"], ["42P01", "schema"],
   ["ECONNREFUSED", "connection"], ["ETIMEDOUT", "timeout"], ["ENOTFOUND", "dns"],
   ["SELF_SIGNED_CERT_IN_CHAIN", "tls"], ["UNABLE_TO_VERIFY_LEAF_SIGNATURE", "tls"],
-  ["CERT_HAS_EXPIRED", "tls"],
+  ["CERT_HAS_EXPIRED", "tls"], ["ERR_TLS_CERT_ALTNAME_INVALID", "tls"],
+  ["TOBI_INVALID_CA_CERT", "configuration"],
 ]);
 
 // Only code/cause are inspected; never stringify or retain the original error.
@@ -39,6 +41,31 @@ export type ConfigSqlClient = {
 export type ConfigSqlProvider = () => Promise<ConfigSqlClient>;
 let poolPromise: Promise<ConfigSqlClient> | undefined;
 
+function validatedCa(): { ca?: string } {
+  const ca = process.env.DATABASE_CA_CERT;
+  if (ca === undefined) return {};
+  try {
+    const pattern = /-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/g;
+    let end = 0;
+    let count = 0;
+    for (const match of ca.matchAll(pattern)) {
+      if (ca.slice(end, match.index).trim()) throw new Error();
+      const body = match[1].replace(/\s/g, "");
+      if (!body || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body)) throw new Error();
+      const der = Buffer.from(body, "base64");
+      if (der.toString("base64") !== body) throw new Error();
+      const cert = new X509Certificate(match[0]);
+      if (!cert.raw.equals(der)) throw new Error();
+      end = match.index! + match[0].length;
+      count++;
+    }
+    if (!count || ca.slice(end).trim()) throw new Error();
+    return { ca };
+  } catch {
+    throw Object.assign(new Error("Invalid TOBi CA certificate configuration."), { code: "TOBI_INVALID_CA_CERT" });
+  }
+}
+
 async function serverPool(): Promise<ConfigSqlClient> {
   if (!process.env.DATABASE_URL) {
     throw new Error("TOBi configuration unavailable: DATABASE_URL is required.");
@@ -53,12 +80,13 @@ async function serverPool(): Promise<ConfigSqlClient> {
       // pg connection-string SSL parameters can override ssl options; remove them
       // so TLS verification cannot be disabled through a URL query parameter.
       for (const key of ["sslmode", "sslcert", "sslkey", "sslrootcert", "ssl", "uselibpqcompat"]) url.searchParams.delete(key);
+      const caOptions = validatedCa();
       const pool = new Pool({
         connectionString: url.toString(),
         max: 2,
         idleTimeoutMillis: 10_000,
         connectionTimeoutMillis: 5_000,
-        ssl: { rejectUnauthorized: true },
+        ssl: { rejectUnauthorized: true, ...caOptions },
       });
       pool.on("error", (error: unknown) => { reportPostgresFailure("idle_pool", error); });
       return pool as ConfigSqlClient;

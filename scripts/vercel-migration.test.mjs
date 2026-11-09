@@ -192,3 +192,44 @@ test('public/admin route failures log only fixed context and preserve API and sp
     } finally { authHook.deregister(); }
   } finally { hook.deregister(); console.error = original; }
 });
+
+test('CA configuration is strict, safe, recoverable and preserves default TLS options', async () => {
+  const { fixtures } = await import('./tobi-tls-fixtures.mjs');
+  const fixture = await fixtures();
+  const prior = { ...process.env };
+  const original = console.error;
+  const logs = [];
+  const options = [];
+  globalThis.__tobiCaOptions = options;
+  const driver = 'data:text/javascript,' + encodeURIComponent('export class Pool { constructor(options) { globalThis.__tobiCaOptions.push(options); } on() {} async query() { return {rows:[]}; } }');
+  const hook = registerHooks({ resolve(s,c,n) { return s === 'pg' ? { shortCircuit:true, url:driver } : n(s,c); } });
+  console.error = (...args) => logs.push(args);
+  try {
+    process.env.DATABASE_URL = 'postgres://fake:unique-fake-password@fake.invalid/db?sslmode=disable&sslrootcert=bad&sslcert=bad&sslkey=bad&ssl=false&uselibpqcompat=true';
+    let sequence = 0;
+    for (const value of [undefined, fixture.ca, fixture.other + fixture.ca, '', ' \n', 'unique-fake-password', fixture.ca + 'text', 'text' + fixture.ca, fixture.ca.replace(/\n/g, '\\n'), fixture.ca.replace('-----BEGIN CERTIFICATE-----\n', '-----BEGIN CERTIFICATE-----'), fixture.ca.replace(/MI/, '!I'), fixture.ca.slice(0,-30), fixture.ca + '-----BEGIN CERTIFICATE-----\n!!!!\n-----END CERTIFICATE-----', fixture.ca + '-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----']) {
+      if (value === undefined) delete process.env.DATABASE_CA_CERT; else process.env.DATABASE_CA_CERT = value;
+      const { createPostgresTobiConfigRepository } = await import(`../lib/tobi-config-postgres.ts?ca=${sequence++}`);
+      const repo = createPostgresTobiConfigRepository();
+      const before = options.length;
+      logs.length = 0;
+      if (sequence <= 3) {
+        assert.equal(await repo.readActive(), null);
+        const ssl = options.at(-1).ssl;
+        assert.equal(ssl.rejectUnauthorized, true);
+        assert.equal(Object.hasOwn(ssl,'checkServerIdentity'), false);
+        assert.equal(Object.hasOwn(ssl,'servername'), false);
+        assert.equal(Object.hasOwn(ssl,'ca'), value !== undefined);
+        assert.equal(ssl.ca === value, true);
+        assert.equal(/sslmode|sslrootcert|sslcert|sslkey|ssl=|uselibpqcompat/.test(options.at(-1).connectionString), false);
+      } else {
+        await assert.rejects(repo.readActive(), e => e.message === 'TOBi configuration unavailable: PostgreSQL initialization failed.' && e.cause === undefined);
+        assert.equal(options.length, before);
+        assert.equal(JSON.stringify(logs) === JSON.stringify([['TOBi PostgreSQL failure','{"phase":"initialization","code":"TOBI_INVALID_CA_CERT","category":"configuration"}']]), true);
+        process.env.DATABASE_CA_CERT = fixture.ca;
+        assert.equal(await repo.readActive(), null);
+        assert.equal(options.length, before + 1);
+      }
+    }
+  } finally { hook.deregister(); process.env = prior; console.error = original; delete globalThis.__tobiCaOptions; await fixture.cleanup(); }
+});

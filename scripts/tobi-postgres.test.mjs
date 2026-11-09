@@ -76,6 +76,7 @@ test('PGlite actual SQL seed/CAS/read/JSON plus RLS and client grants', async ()
 const diagnosticCodes = {
   '28P01': 'authentication', '42501': 'permission', '42P01': 'schema',
   ECONNREFUSED: 'connection', ETIMEDOUT: 'timeout', ENOTFOUND: 'dns',
+  TOBI_INVALID_CA_CERT: 'configuration', ERR_TLS_CERT_ALTNAME_INVALID: 'tls',
   SELF_SIGNED_CERT_IN_CHAIN: 'tls', UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'tls', CERT_HAS_EXPIRED: 'tls',
 };
 const fakeSecret = 'unique-fake-password-TOBi-98172';
