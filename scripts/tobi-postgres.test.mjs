@@ -72,3 +72,51 @@ test('PGlite actual SQL seed/CAS/read/JSON plus RLS and client grants', async ()
     }
   } finally { await db.close(); }
 });
+
+const diagnosticCodes = {
+  '28P01': 'authentication', '42501': 'permission', '42P01': 'schema',
+  ECONNREFUSED: 'connection', ETIMEDOUT: 'timeout', ENOTFOUND: 'dns',
+  SELF_SIGNED_CERT_IN_CHAIN: 'tls', UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'tls', CERT_HAS_EXPIRED: 'tls',
+};
+const fakeSecret = 'unique-fake-password-TOBi-98172';
+const fakeUrl = `postgres://fake:${fakeSecret}@fake.invalid:5432/fake`;
+function poisoned(code = fakeUrl) {
+  const error = new Error(fakeUrl);
+  Object.assign(error, { stack: fakeUrl, code, detail: fakeUrl, query: fakeUrl, parameters: [fakeUrl], cause: { message: fakeUrl, code: fakeUrl } });
+  return error;
+}
+function expectedLog(phase, code = 'UNKNOWN', category = 'unknown') {
+  return ['TOBi PostgreSQL failure', JSON.stringify({ phase, code, category })];
+}
+
+test('adapter diagnostics use exact safe arguments for query/provider and bounded hostile causes', async () => {
+  const original = console.error;
+  const logs = [];
+  console.error = (...args) => logs.push(args);
+  try {
+    const cycle = poisoned(); cycle.cause = cycle;
+    const throwing = Object.defineProperties({}, { code: { get() { throw poisoned(); } }, cause: { get() { throw poisoned(); } } });
+    const unread = Object.defineProperties({ code: '28P01' }, Object.fromEntries(['message', 'stack', 'detail', 'hint', 'query', 'parameters', 'config', 'cause'].map(key => [key, { get() { throw new Error('must not read'); } }])));
+    const cases = [
+      ...Object.entries(diagnosticCodes).map(([code, category]) => [poisoned(code), code, category]),
+      [poisoned(), 'UNKNOWN', 'unknown'], [{ code: 'ZZ999' }, 'UNKNOWN', 'unknown'],
+      [{ cause: { cause: { cause: { code: '42501' } } } }, '42501', 'permission'],
+      [{ cause: { cause: { cause: { cause: { code: '28P01' } } } } }, 'UNKNOWN', 'unknown'],
+      [cycle, 'UNKNOWN', 'unknown'], [throwing, 'UNKNOWN', 'unknown'], [unread, '28P01', 'authentication'],
+      [{ code: 'toString' }, 'UNKNOWN', 'unknown'],
+    ];
+    for (const phase of ['provider', 'query']) for (const [raw, code, category] of cases) {
+      logs.length = 0;
+      const repo = createPostgresTobiConfigRepository(async () => {
+        if (phase === 'provider') throw raw;
+        return { async query() { throw raw; } };
+      });
+      await assert.rejects(repo.readActive(), error => {
+        assert.equal(error.message, `TOBi configuration unavailable: PostgreSQL ${phase === 'provider' ? 'provider' : 'query'} failed.`);
+        assert.equal(error.cause, undefined);
+        return true;
+      });
+      assert.deepEqual(logs, [expectedLog(phase, code, category)]);
+    }
+  } finally { console.error = original; }
+});

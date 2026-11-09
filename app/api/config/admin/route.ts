@@ -23,8 +23,8 @@ export async function GET(request: Request) {
   if (!isTobiAdminAuthorized(request.headers)) return forbidden();
   try {
     return Response.json(await getTobiAdminConfigSnapshot(), { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
-    console.error("Admin TOBi config load failed", error instanceof Error ? error.message : "unknown_error");
+  } catch {
+    console.error("Admin TOBi config load failed");
     return Response.json({ error: "config_unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }
@@ -56,7 +56,7 @@ export async function PUT(request: Request) {
     if (error instanceof ZodError || error instanceof TypeError) {
       return Response.json({ error: "invalid_config" }, { status: 400, headers: { "Cache-Control": "no-store" } });
     }
-    console.error("Admin TOBi config save failed", error instanceof Error ? error.message : "unknown_error");
+    console.error("Admin TOBi config save failed");
     return Response.json({ error: "config_unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }

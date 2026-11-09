@@ -1,5 +1,37 @@
 import type { TobiConfigRepository, TobiConfigRow } from "./tobi-config-repository.ts";
 
+type PostgresFailurePhase = "initialization" | "provider" | "query" | "idle_pool";
+const failureCodes = new Map<string, string>([
+  ["28P01", "authentication"], ["42501", "permission"], ["42P01", "schema"],
+  ["ECONNREFUSED", "connection"], ["ETIMEDOUT", "timeout"], ["ENOTFOUND", "dns"],
+  ["SELF_SIGNED_CERT_IN_CHAIN", "tls"], ["UNABLE_TO_VERIFY_LEAF_SIGNATURE", "tls"],
+  ["CERT_HAS_EXPIRED", "tls"],
+]);
+
+// Only code/cause are inspected; never stringify or retain the original error.
+function reportPostgresFailure(phase: PostgresFailurePhase, raw: unknown): void {
+  let code = "UNKNOWN";
+  let category = "unknown";
+  const seen = new Set<object>();
+  let node = raw;
+  for (let depth = 0; depth < 4; depth++) {
+    if (node === null || (typeof node !== "object" && typeof node !== "function") || seen.has(node)) break;
+    seen.add(node);
+    try {
+      const candidate: unknown = (node as { code?: unknown }).code;
+      if (typeof candidate === "string" && failureCodes.has(candidate)) {
+        code = candidate;
+        category = failureCodes.get(candidate)!;
+        break;
+      }
+    } catch { /* A hostile getter supplies no trusted code. */ }
+    if (depth === 3) break;
+    try { node = (node as { cause?: unknown }).cause; }
+    catch { break; }
+  }
+  console.error("TOBi PostgreSQL failure", JSON.stringify({ phase, code, category }));
+}
+
 // Structurally compatible with pg.Pool; injected clients allow isolated tests.
 export type ConfigSqlClient = {
   query(sql: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
@@ -28,9 +60,10 @@ async function serverPool(): Promise<ConfigSqlClient> {
         connectionTimeoutMillis: 5_000,
         ssl: { rejectUnauthorized: true },
       });
-      pool.on("error", () => { console.error("TOBi PostgreSQL pool unavailable"); });
+      pool.on("error", (error: unknown) => { reportPostgresFailure("idle_pool", error); });
       return pool as ConfigSqlClient;
-    })().catch(() => {
+    })().catch((error: unknown) => {
+      reportPostgresFailure("initialization", error);
       poolPromise = undefined;
       throw new Error("TOBi configuration unavailable: PostgreSQL initialization failed.");
     });
@@ -48,9 +81,19 @@ function mapRow(row: Record<string, unknown> | undefined): TobiConfigRow | null 
 
 export function createPostgresTobiConfigRepository(provider: ConfigSqlProvider = serverPool): TobiConfigRepository {
   async function query(sql: string, values: unknown[] = []) {
-    const client = await provider();
+    let client: ConfigSqlClient;
+    try { client = await provider(); }
+    catch (error) {
+      // serverPool already produces safe errors and reports initialization failures.
+      if (provider === serverPool) throw error;
+      reportPostgresFailure("provider", error);
+      throw new Error("TOBi configuration unavailable: PostgreSQL provider failed.");
+    }
     try { return await client.query(sql, values); }
-    catch { throw new Error("TOBi configuration unavailable: PostgreSQL query failed."); }
+    catch (error) {
+      reportPostgresFailure("query", error);
+      throw new Error("TOBi configuration unavailable: PostgreSQL query failed.");
+    }
   }
   return {
     async readActive() {

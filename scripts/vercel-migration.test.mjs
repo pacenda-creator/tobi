@@ -41,7 +41,8 @@ test('PostgreSQL adapter imports without a connection and has no eager pg depend
   let calls = 0;
   const repository = createPostgresTobiConfigRepository(async () => { calls++; throw new Error('not called on import'); });
   assert.equal(calls, 0);
-  await assert.rejects(repository.readActive(), /not called on import/);
+  await assert.rejects(repository.readActive(), /PostgreSQL provider failed/);
+  assert.equal(calls, 1);
 });
 
 test('real lazy driver path imports pg and creates a single pool only on first configured read', async () => {
@@ -118,4 +119,76 @@ test('admin GET/PUT reject spoof headers before any DB access; public API return
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), { error: 'config_unavailable' });
   } finally { process.env = prior; }
+});
+
+test('lazy pg initialization and idle pool events report safe phases before sanitization', async () => {
+  const original = console.error;
+  const logs = [];
+  console.error = (...args) => logs.push(args);
+  const prior = { ...process.env };
+  const driverUrl = 'data:text/javascript,' + encodeURIComponent(`
+    export let fail = true;
+    export let listener;
+    export class Pool {
+      constructor() { if (fail) { fail = false; throw Object.assign(new Error('postgres://fake:unique-fake-password@fake.invalid/db'), { code: '28P01' }); } }
+      on(event, callback) { if (event === 'error') listener = callback; }
+      async query() { return { rows: [] }; }
+    }
+  `);
+  const hook = registerHooks({ resolve(specifier, context, nextResolve) {
+    if (specifier === 'pg') return { shortCircuit: true, url: driverUrl };
+    return nextResolve(specifier, context);
+  } });
+  try {
+    process.env.DATABASE_URL = 'postgres://fake:fake@fake.invalid/fake';
+    const { createPostgresTobiConfigRepository } = await import('../lib/tobi-config-postgres.ts?diagnostic-phases');
+    const repo = createPostgresTobiConfigRepository();
+    await assert.rejects(repo.readActive(), { message: 'TOBi configuration unavailable: PostgreSQL initialization failed.' });
+    assert.deepEqual(logs, [['TOBi PostgreSQL failure', '{"phase":"initialization","code":"28P01","category":"authentication"}']]);
+    await repo.readActive();
+    logs.length = 0;
+    (await import(driverUrl)).listener({ code: 'CERT_HAS_EXPIRED', message: 'postgres://fake:unique-fake-password@fake.invalid/db' });
+    assert.deepEqual(logs, [['TOBi PostgreSQL failure', '{"phase":"idle_pool","code":"CERT_HAS_EXPIRED","category":"tls"}']]);
+  } finally { hook.deregister(); process.env = prior; console.error = original; }
+});
+
+test('public/admin route failures log only fixed context and preserve API and spoof rejection', async () => {
+  const original = console.error;
+  const logs = [];
+  console.error = (...args) => logs.push(args);
+  const raw = new Error('postgres://fake:unique-fake-password-TOBi-98172@fake.invalid/db');
+  const storeUrl = 'data:text/javascript,' + encodeURIComponent(`
+    export class TobiConfigVersionConflictError extends Error {}
+    export async function getTobiPublicConfigSnapshot() { throw Object.assign(new Error(${JSON.stringify(raw.message)}), { stack: ${JSON.stringify(raw.message)}, cause: { code: ${JSON.stringify(raw.message)} }, code: ${JSON.stringify(raw.message)}, detail: ${JSON.stringify(raw.message)}, query: ${JSON.stringify(raw.message)}, parameters: [${JSON.stringify(raw.message)}] }); }
+    export const getTobiAdminConfigSnapshot = getTobiPublicConfigSnapshot;
+    export const saveTobiConfig = getTobiPublicConfigSnapshot;
+  `);
+  const hook = registerHooks({ resolve(specifier, context, nextResolve) {
+    if (specifier === '@/lib/tobi-config-store') return { shortCircuit: true, url: storeUrl };
+    return nextResolve(specifier, context);
+  } });
+  try {
+    const api = await import('../app/api/config/public/route.ts?diagnostic-test');
+    const response = await api.GET(new Request('https://tobi.example/api/config/public'));
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: 'config_unavailable' });
+    assert.deepEqual(logs, [['Public TOBi config load failed']]);
+    const admin = await import('../app/api/config/admin/route.ts?diagnostic-test');
+    assert.equal((await admin.GET(new Request('https://tobi.example/api/config/admin', { headers: { 'oai-authenticated-user-id': 'admin' } }))).status, 403);
+    // Isolate the error branches without changing real fail-closed authentication.
+    const authHook = registerHooks({ resolve(specifier, context, nextResolve) {
+      if (specifier === '@/lib/tobi-admin-auth') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const TOBI_CONFIG_MAX_BYTES = 100000; export const declaredBodyFits = () => true; export const hasJsonContentType = () => true; export const hasValidMutationOrigin = () => true; export const isTobiAdminAuthorized = () => true;') };
+      return nextResolve(specifier, context);
+    } });
+    try {
+      const authorized = await import('../app/api/config/admin/route.ts?diagnostic-authorized-test');
+      for (const method of ['GET', 'PUT']) {
+        logs.length = 0;
+        const response = await authorized[method](new Request('https://tobi.example/api/config/admin', { method, ...(method === 'PUT' ? { body: JSON.stringify({ expectedVersion: 1, config: {} }) } : {}) }));
+        assert.equal(response.status, 503);
+        assert.deepEqual(await response.json(), { error: 'config_unavailable' });
+        assert.deepEqual(logs, [[`Admin TOBi config ${method === 'GET' ? 'load' : 'save'} failed`]]);
+      }
+    } finally { authHook.deregister(); }
+  } finally { hook.deregister(); console.error = original; }
 });

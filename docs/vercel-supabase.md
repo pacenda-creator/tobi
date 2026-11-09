@@ -37,3 +37,11 @@ Odblokování vyžaduje samostatně schválenou a implementovanou serverem ově�
 ## Ověření bez DB
 
 `node scripts/run-next-build-no-db.mjs` odstraní connection proměnné DATABASE_URL, POSTGRES_* a SUPABASE_* z prostředí potomka a spustí skutečné `npm run build`; nevytváří dummy credentials. V tomto checkoutu není `.env.local` ani jiný env soubor s hodnotami. Před host ověřením zajistěte totéž, protože Next může env soubory načítat. Runtime logy, RED/GREEN a build výstupy jsou v ignorovaném `.sites-runtime/migration/`. Nejde o release evidenci ani schválení nasazení.
+
+## Bezpečná serverová diagnostika PostgreSQL
+
+Adapter volá `console.error("TOBi PostgreSQL failure", JSON.stringify({ phase, code, category }))`: přesně dva string argumenty, JSON má pouze klíče `phase`, `code`, `category` v tomto pořadí. Například `TOBi PostgreSQL failure {"phase":"query","code":"28P01","category":"authentication"}`. Fáze jsou `initialization`, `provider` (injektovaný provider), `query`, `idle_pool`. Inicializace výchozího poolu se hlásí před nahrazením chyby bezpečnou obecnou zprávou; znovu se nehlásí jako provider.
+
+Pevný allowlist mapuje `28P01` → `authentication`, `42501` → `permission`, `42P01` → `schema`, `ECONNREFUSED` → `connection`, `ETIMEDOUT` → `timeout`, `ENOTFOUND` → `dns` a `SELF_SIGNED_CERT_IN_CHAIN`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `CERT_HAS_EXPIRED` → `tls`. Ostatní hodnoty se nikdy neopisují: fallback je `UNKNOWN` / `unknown`. Neznámý kód není diagnóza příčiny incidentu.
+
+Prohlížejí se pouze `code` a řetězec `cause`, nejvýše čtyři uzly včetně původní chyby; cyklus a házející gettery zpracování bezpečně ukončí nebo přeskočí. Message, stack, SQL a další raw data se nelogují ani neukládají do vyhazované cause. Config routy logují pouze své pevné kontextové zprávy; HTTP odpovědi neobsahují diagnostická metadata. Živý Vercel incident nebyl tímto lokálním ověřením reprodukován.
