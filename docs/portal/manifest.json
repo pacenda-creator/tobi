@@ -46,7 +46,7 @@
     "scripts/chat-contract-v1.test.mjs": "e8c24b3623e2c6ddf9468b203e2bb53c077e93ff6e1dae8a565eeead87cd7c7a",
     "scripts/conversation-orchestrator.test.mjs": "3e0da758207235ce5c9e0784d060b41ba062cb7a495deab936d2d063a9120717",
     "scripts/demo-scenario-flow.test.mjs": "d98bbfa208c973edb810bc58b18afb9a36b996854f575ed88d5b96d4c1b082ef",
-    "scripts/docs-portal.test.mjs": "68f2ab4a57a3e9e50abf40d29827b46b5ddfde017d9fe8500eca287ccff3c2c9",
+    "scripts/docs-portal.test.mjs": "939a03adc83421aa501f7e253542a33b9a0978f6ade4d7d6fc4a85b12fb15a61",
     "scripts/mock-operator.test.mjs": "c207dcabcb8075e5292723ce63fc1a5cce3a887832aeba68825ea1840139153a",
     "scripts/rag-response-plan.test.mjs": "f18b72227e160e0c4747b741b75dd6145dfe6d3608e580016baed298d41dec3e",
     "scripts/router-diagnostics.test.mjs": "e9082aac66be9db4790d49d320c13b657a206e3cdf4dccc0af261113a34977d1",

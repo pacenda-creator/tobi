@@ -50,109 +50,131 @@ test("klientský portál neimportuje verzované zdroje ani nepoužívá raw HTML
   assert.doesNotMatch(clientSources, /dangerouslySetInnerHTML/);
 });
 
-test("provenance odmítne neexistující commit i při správném formátu SHA", async () => {
-  const { validateSourceProvenance } = await import("./docs-provenance.mjs");
-  const manifest = JSON.parse(readFileSync(new URL("../docs/portal/manifest.json", import.meta.url)));
-  await assert.rejects(() => validateSourceProvenance({ ...manifest, sourceRevision: "0".repeat(40), sourceBaseUrl: `https://github.com/pacenda-creator/tobi/blob/${"0".repeat(40)}` }, []), /commit/);
-});
+const repository = "https://github.com/pacenda-creator/tobi.git";
 
-test("provenance kontroluje repo, přesnou URL, cesty, označení a obsah proti base", async () => {
-  const { validateSourceProvenance } = await import("./docs-provenance.mjs");
+async function provenanceFixture(t) {
+  const { git, validateSourceProvenance } = await import("./docs-provenance.mjs");
+  const { mkdtemp, mkdir, writeFile, rm, symlink, stat, readFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
   const { createHash } = await import("node:crypto");
-  const base = "91d4f6d57b547c34ca38ce8afca10652ea83141b";
-  const path = "app/doc/page.tsx";
-  const digest = createHash("sha256").update(readFileSync(path)).digest("hex");
-  const manifest = { sourceRevision: base, sourceRepositoryUrl: "https://github.com/pacenda-creator/tobi.git", sourceBaseUrl: `https://github.com/pacenda-creator/tobi/blob/${base}`, changedSources: { [path]: digest } };
-  await assert.doesNotReject(() => validateSourceProvenance(manifest, [path]));
-  for (const patch of [
-    { sourceRepositoryUrl: "https://github.com/other/repo.git" },
-    { sourceBaseUrl: `${manifest.sourceBaseUrl}/tobi-prototype` },
-    { sourceBaseUrl: `${manifest.sourceBaseUrl}?fake=1` },
-    { changedSources: {} },
-    { changedSources: { [path]: "0".repeat(64) } },
-    { changedSources: { [path]: digest, "../outside": digest } },
-    { changedSources: { [path]: digest, "README.md": digest } },
-  ]) await assert.rejects(() => validateSourceProvenance({ ...manifest, ...patch }, [path]));
+  const temporary = await mkdtemp(join(tmpdir(), "docs-provenance-"));
+  // Register before setup so failed init/config/commit also gets cleaned up.
+  t.after(() => rm(temporary, { recursive: true, force: true }));
+  const root = join(temporary, "repo");
+  await mkdir(root);
+  const run = (args) => git(args, root);
+  await run(["init", "--object-format=sha1", "--initial-branch=fixture"]);
+  assert.equal((await stat(join(root, ".git"))).isDirectory(), true);
+  for (const [key, value] of [
+    ["user.name", "Provenance Fixture"],
+    ["user.email", "fixture@example.invalid"],
+    ["commit.gpgSign", "false"],
+    ["tag.gpgSign", "false"],
+    ["core.autocrlf", "false"],
+    ["core.hooksPath", join(temporary, "empty-hooks")],
+    ["remote.origin.url", repository],
+  ]) await run(["config", "--local", key, value]);
+  await mkdir(join(temporary, "empty-hooks"));
+  const path = "source.txt";
+  const baseContent = Buffer.from("original text\n");
+  const content = Buffer.from("changed text\n");
+  const write = (path, bytes) => writeFile(join(root, path), bytes);
+  const commit = async (message) => {
+    await run(["add", "--all"]);
+    await run(["commit", "-m", message]);
+    return String(await run(["rev-parse", "HEAD"])).trim();
+  };
+  await write(path, baseContent);
+  await write("unchanged.txt", "stable text\n");
+  const base = await commit("base");
+  await write(path, content);
+  const modified = await commit("modify existing text");
+  await write("added.txt", "new text\n");
+  const head = await commit("only add files");
+  assert.equal(String(await run(["rev-parse", "HEAD^"])).trim(), modified);
+  assert.deepEqual(String(await run(["diff-tree", "--no-commit-id", "--name-status", "-r", modified, head])).trim().split("\n"), ["A\tadded.txt"]);
+  assert.equal(String(await run(["status", "--porcelain"])), "");
+  const actualBase = await run(["show", `${base}:${path}`]);
+  const actualHead = await run(["show", `${head}:${path}`]);
+  assert.deepEqual(actualBase, baseContent);
+  assert.deepEqual(actualHead, content);
+  assert.equal(actualHead.equals(actualBase), false);
+  const digest = createHash("sha256").update(actualHead).digest("hex");
+  assert.equal(createHash("sha256").update(await readFile(join(root, path))).digest("hex"), digest);
+  const manifest = { sourceRevision: base, sourceRepositoryUrl: repository, sourceBaseUrl: `https://github.com/pacenda-creator/tobi/blob/${base}`, changedSources: { [path]: digest } };
+  const validate = (value = manifest, paths = [path]) => validateSourceProvenance(value, paths, root);
+  return { root, temporary, run, write, symlink, join, path, baseContent, content, digest, manifest, validate, validateSourceProvenance };
+}
+
+test("provenance kontroluje repo, origin, přesnou URL, cesty, označení a checksum", async (t) => {
+  const { run, path, digest, manifest, validate } = await provenanceFixture(t);
+  await assert.doesNotReject(() => validate());
+  for (const [patch, pattern] of [
+    [{ sourceRepositoryUrl: "https://github.com/other/repo.git" }, /repository\/origin/],
+    [{ sourceBaseUrl: `${manifest.sourceBaseUrl}/tobi-prototype` }, /sourceBaseUrl/],
+    [{ sourceBaseUrl: `${manifest.sourceBaseUrl}?fake=1` }, /sourceBaseUrl/],
+    [{ changedSources: {} }, /checksum/],
+    [{ changedSources: { [path]: "0".repeat(64) } }, /checksum/],
+    [{ changedSources: { [path]: digest, "../outside": digest } }, /Nepoužitá/],
+    [{ changedSources: { [path]: digest, "unchanged.txt": digest } }, /Nepoužitá/],
+    [{ sourceRevision: "bad" }, /SHA/],
+  ]) await assert.rejects(() => validate({ ...manifest, ...patch }), pattern);
+  await assert.rejects(() => validate({ ...manifest, changedSources: {} }, ["../outside"]), /cesta/);
+  await assert.rejects(() => validate({ ...manifest, changedSources: { "unchanged.txt": digest } }, ["unchanged.txt"]), /nesmí být označen/);
+  await run(["config", "--local", "remote.origin.url", "https://github.com/other/repo.git"]);
+  await assert.rejects(() => validate(), /repository\/origin/);
 });
 
-test("provozní chyba Git není neexistující commit", async () => {
-  const { validateSourceProvenance } = await import("./docs-provenance.mjs");
-  const manifest = JSON.parse(readFileSync("docs/portal/manifest.json"));
+test("provenance odmítne neexistující commit i při správném formátu SHA", async (t) => {
+  const { manifest, validate } = await provenanceFixture(t);
+  const sourceRevision = "0".repeat(40);
+  await assert.rejects(() => validate({
+    ...manifest,
+    sourceRevision,
+    sourceBaseUrl: `https://github.com/pacenda-creator/tobi/blob/${sourceRevision}`,
+  }), /commit neexistuje/);
+});
+
+test("provenance odmítne změněný obsah s nesprávným checksumem a přijme obnovený obsah", async (t) => {
+  const { write, path, content, validate } = await provenanceFixture(t);
+  await assert.doesNotReject(() => validate());
+  await write(path, "tampered text\n");
+  await assert.rejects(() => validate(), /checksum/);
+  await write(path, content);
+  await assert.doesNotReject(() => validate());
+});
+
+test("base funguje i při posledním pouze přidávajícím commitu a dirty stromu", async (t) => {
+  const { root, temporary, run, write, symlink, join, path, baseContent, content, manifest, validate } = await provenanceFixture(t);
+  await validate();
+  await write("unrelated-dirty-file", "dirty");
+  assert.notEqual(String(await run(["status", "--porcelain"])), "");
+  await validate();
+  await write(path, baseContent);
+  await assert.rejects(() => validate(), /Publikovaný zdroj/);
+  await write(path, content);
+  await write("copy.txt", content);
+  await assert.rejects(() => validate({ ...manifest, changedSources: {} }, ["copy.txt"]), /checksum/);
+  const outside = join(temporary, "outside.txt");
+  const { writeFile } = await import("node:fs/promises");
+  await writeFile(outside, "outside fixture repository");
+  await symlink(outside, join(root, "escape"));
+  await assert.rejects(() => validate({ ...manifest, changedSources: {} }, ["escape"]), /opouští repository/);
+});
+
+test("provozní chyba Git není neexistující commit", async (t) => {
+  const { root, manifest, validateSourceProvenance } = await provenanceFixture(t);
   for (const code of ["EPERM", "ENOENT"]) {
-    await assert.rejects(() => validateSourceProvenance(manifest, [], process.cwd(), async () => {
-      throw Object.assign(new Error("runner failure"), { code, stdout: "91d4f6d57b547c34ca38ce8afca10652ea83141b", status: 0 });
+    await assert.rejects(() => validateSourceProvenance(manifest, [], root, async () => {
+      throw Object.assign(new Error("runner failure"), { code, stdout: manifest.sourceRevision, status: 0 });
     }), (error) => error.code === "GIT_OPERATIONAL" && error.cause.code === code);
   }
 });
 
-async function selectModifiedTextSource(run, base, head) {
-  const paths = String(await run(["diff-tree", "--no-commit-id", "--name-only", "--diff-filter=M", "-z", "-r", base, head])).split("\0").filter(Boolean);
-  for (const path of paths) {
-    const entries = await Promise.all([base, head].map((revision) => run(["ls-tree", "-z", revision, "--", path])));
-    if (!entries.every((entry) => /^100(?:644|755) blob [a-f0-9]{40}\t[^\0]+\0$/u.test(String(entry)))) continue;
-    const [baseContent, content] = await Promise.all([run(["show", `${base}:${path}`]), run(["show", `${head}:${path}`])]);
-    const isText = (bytes) => !bytes.includes(0) && Buffer.from(bytes.toString("utf8")).equals(bytes);
-    if (isText(baseContent) && isText(content) && !content.equals(baseContent)) return { path, content, baseContent };
-  }
-  throw new Error("Historie neobsahuje změněný běžný textový soubor v obou revizích");
-}
-
-test("výběr historické změny přeskočí added-file-first a neobyčejné nebo binární soubory", async () => {
-  const calls = [];
-  const run = async (args) => {
-    calls.push(args);
-    if (args[0] === "diff-tree") return Buffer.from(args.includes("--diff-filter=M") ? "link\0binary.txt\0modified.txt\0" : ".env.example\nlink\nbinary.txt\nmodified.txt\n");
-    if (args[0] === "ls-tree") {
-      const path = args.at(-1);
-      return Buffer.from(`${path === "link" ? "120000" : "100644"} blob ${"a".repeat(40)}\t${path}\0`);
-    }
-    if (args[0] === "show" && args[1].endsWith(":binary.txt")) return Buffer.from([0, 1]);
-    if (args[0] === "show" && args[1].endsWith(":modified.txt")) return Buffer.from(args[1].startsWith("base:") ? "before" : "after");
-    throw new Error(`Unexpected Git call: ${JSON.stringify(args)}`);
-  };
-  const selected = await selectModifiedTextSource(run, "base", "head");
-  assert.equal(selected.path, "modified.txt");
-  assert.equal(selected.content.equals(selected.baseContent), false);
-  for (const revision of ["base", "head"]) assert.ok(calls.some((args) => args[0] === "ls-tree" && args.includes(revision) && args.at(-1) === "modified.txt"));
-  assert.ok(calls.some((args) => args[0] === "diff-tree" && args.includes("--diff-filter=M")));
-});
-
-test("base funguje nad existující historií nezávisle na dirty statusu", async () => {
-  const { git, validateSourceProvenance } = await import("./docs-provenance.mjs");
-  const { mkdtemp, mkdir, writeFile, rm, symlink } = await import("node:fs/promises");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const base = String(await git(["rev-parse", "HEAD^"])).trim();
-  const { path, content, baseContent } = await selectModifiedTextSource(git, base, "HEAD");
-  const { createHash } = await import("node:crypto");
-  const manifest = { sourceRevision: base, sourceRepositoryUrl: "https://github.com/pacenda-creator/tobi.git", sourceBaseUrl: `https://github.com/pacenda-creator/tobi/blob/${base}`, changedSources: content.equals(baseContent) ? {} : { [path]: createHash("sha256").update(content).digest("hex") } };
-  const root = await mkdtemp(join(tmpdir(), "docs-provenance-"));
-  try {
-    // Reuse real existing objects and HEAD; no new commits, refs or index writes.
-    await writeFile(join(root, ".git"), `gitdir: ${process.cwd()}/.git\n`);
-    await mkdir(join(root, path).slice(0, join(root, path).lastIndexOf("/")), { recursive: true });
-    await writeFile(join(root, path), content);
-    assert.equal(content.equals(baseContent), false, "Skutečná commitnutá změna vůči předkovi");
-    await validateSourceProvenance(manifest, [path], root);
-    await writeFile(join(root, "unrelated-dirty-file"), "dirty");
-    await validateSourceProvenance(manifest, [path], root);
-    await assert.rejects(() => validateSourceProvenance({ ...manifest, sourceRevision: "bad" }, [path], root), /SHA/);
-    await assert.rejects(() => validateSourceProvenance({ ...manifest, changedSources: {} }, ["../README.md"], root), /cesta/);
-    await assert.rejects(() => validateSourceProvenance({ ...manifest, changedSources: { [path]: "0".repeat(64) } }, [path], root));
-    await writeFile(join(root, path), baseContent);
-    await assert.rejects(() => validateSourceProvenance(manifest, [path], root), /Publikovaný zdroj/);
-    await symlink(`${process.cwd()}/README.md`, join(root, "escape"));
-    await assert.rejects(() => validateSourceProvenance({ ...manifest, changedSources: {} }, ["escape"], root), /opouští repository/);
-    await mkdir(join(root, "nested"));
-    await writeFile(join(root, "nested", "copy"), content);
-    await assert.rejects(() => validateSourceProvenance({ ...manifest, changedSources: {} }, ["nested/copy"], root), /checksum/);
-  } finally { await rm(root, { recursive: true, force: true }); }
-});
-
-test("provenance nehashuje vlastní manifest ani jeho metadata", async () => {
-  const { validateSourceProvenance } = await import("./docs-provenance.mjs");
-  const manifest = JSON.parse(readFileSync("docs/portal/manifest.json"));
+test("provenance nehashuje vlastní manifest ani jeho metadata", async (t) => {
+  const { manifest, validate } = await provenanceFixture(t);
   for (const path of ["docs/portal/manifest.json", "docs/portal/features.json", "docs/portal/regression-cases.json", "docs/portal/test-runs.json", "docs/portal/diagrams.json"]) {
-    await assert.rejects(() => validateSourceProvenance({ ...manifest, changedSources: {} }, [path]), /metadata/);
+    await assert.rejects(() => validate({ ...manifest, changedSources: {} }, [path]), /metadata/);
   }
 });
