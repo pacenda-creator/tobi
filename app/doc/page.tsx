@@ -21,16 +21,16 @@ export const metadata: Metadata = {
 
 export default async function TobiDocumentationPage() {
   const requestHeaders = await headers();
-  if (isTobiAdminAuthorized(requestHeaders)) {
+  if (await isTobiAdminAuthorized(requestHeaders)) {
     const { getTobiDocContent } = await import("@/lib/tobi-docs/server-content");
-    return <DocPortal content={getTobiDocContent()} />;
+    return <><form action="/auth/logout" method="post"><button>Odhlásit se</button></form><DocPortal content={getTobiDocContent()} /></>;
   }
 
   return (
     <InternalAccessCard
       title="Dokumentace TOBi — přístup uzamčen"
-      description="BLOCKED: Interní přístup čeká na implementaci serverem ověřené identity a session."
-      primaryAction={null}
+      description="Přístup vyžaduje přihlášení povoleného správce."
+      primaryAction={<a href="/login?next=/doc">Přihlásit se</a>}
     />
   );
 }

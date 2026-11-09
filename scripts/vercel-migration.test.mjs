@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { registerHooks } from 'node:module';
 registerHooks({ resolve(specifier, context, nextResolve) {
-  if (specifier === 'next/headers') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export async function headers() { return new Headers({ "oai-authenticated-user-id": "admin", "oai-authenticated-user-email": "admin@example.com", "host": "localhost" }); }') };
+  if (specifier === 'next/headers') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export async function cookies() { return { getAll() { return []; } }; } export async function headers() { return new Headers({ "oai-authenticated-user-id": "admin", "oai-authenticated-user-email": "admin@example.com", "host": "localhost" }); }') };
   if (specifier === 'next/navigation') return { shortCircuit: true, url: 'data:text/javascript,export function redirect() { throw new Error("redirect"); }' };
   if (specifier.startsWith('@/')) return nextResolve(new URL(`../${specifier.slice(2)}.ts`, import.meta.url).href, context);
   return nextResolve(specifier, context);
@@ -10,7 +10,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
 import { readFile } from 'node:fs/promises';
 import { isTobiAdminAuthorized } from '../lib/tobi-admin-auth.ts';
 
-test('Vercel rejects spoof Sites headers and local development tokens', () => {
+test('Vercel rejects spoof Sites headers and local development tokens', async () => {
   const prior = { ...process.env };
   try {
     process.env.TOBI_ADMIN_EMAILS = 'admin@example.com';
@@ -18,7 +18,7 @@ test('Vercel rejects spoof Sites headers and local development tokens', () => {
     process.env.TOBI_LOCAL_ADMIN_TOKEN = 'test-token';
     for (const mode of ['production', 'development', 'test']) {
       process.env.NODE_ENV = mode;
-      assert.equal(isTobiAdminAuthorized(new Headers({ host: 'localhost:3000', 'oai-authenticated-user-id': 'admin', 'oai-authenticated-user-email': 'admin@example.com', cookie: 'tobi-local-admin-token=test-token' })), false);
+      assert.equal(await isTobiAdminAuthorized(new Headers({ host: 'localhost:3000', 'oai-authenticated-user-id': 'admin', 'oai-authenticated-user-email': 'admin@example.com', cookie: 'tobi-local-admin-token=test-token' })), false);
     }
   } finally { process.env = prior; }
 });
@@ -177,7 +177,7 @@ test('public/admin route failures log only fixed context and preserve API and sp
     assert.equal((await admin.GET(new Request('https://tobi.example/api/config/admin', { headers: { 'oai-authenticated-user-id': 'admin' } }))).status, 403);
     // Isolate the error branches without changing real fail-closed authentication.
     const authHook = registerHooks({ resolve(specifier, context, nextResolve) {
-      if (specifier === '@/lib/tobi-admin-auth') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const TOBI_CONFIG_MAX_BYTES = 100000; export const declaredBodyFits = () => true; export const hasJsonContentType = () => true; export const hasValidMutationOrigin = () => true; export const isTobiAdminAuthorized = () => true;') };
+      if (specifier === '@/lib/tobi-admin-auth') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const TOBI_CONFIG_MAX_BYTES = 100000; export const declaredBodyFits = () => true; export const hasJsonContentType = () => true; export const hasValidMutationOrigin = () => true; export const isTobiAdminAuthorized = async () => true;') };
       return nextResolve(specifier, context);
     } });
     try {

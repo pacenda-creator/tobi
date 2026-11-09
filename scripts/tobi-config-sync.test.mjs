@@ -197,14 +197,14 @@ test("chat odpověď přenáší configVersion", () => {
   assert.equal(response.configVersion, 7);
 });
 
-test("admin API odmítá raw identitu a zachová mutace stejného originu s JSON limitem", () => {
+test("admin API odmítá raw identitu a zachová mutace stejného originu s JSON limitem", async () => {
   const previousEmails = process.env.TOBI_ADMIN_EMAILS;
   process.env.TOBI_ADMIN_EMAILS = "admin@example.com";
   try {
-    assert.equal(isTobiAdminAuthorized(new Headers({ "oai-authenticated-user-id": "user-1", "oai-authenticated-user-email": "ADMIN@example.com" })), false);
-    assert.equal(isTobiAdminAuthorized(new Headers({ "oai-authenticated-user-email": "ADMIN@example.com" })), false);
-    assert.equal(isTobiAdminAuthorized(new Headers({ "oai-authenticated-user-id": "user-1" })), false);
-    assert.equal(isTobiAdminAuthorized(new Headers({ "oai-authenticated-user-id": "user-2", "oai-authenticated-user-email": "customer@example.com" })), false);
+    assert.equal(await isTobiAdminAuthorized(new Headers({ "oai-authenticated-user-id": "user-1", "oai-authenticated-user-email": "ADMIN@example.com" })), false);
+    assert.equal(await isTobiAdminAuthorized(new Headers({ "oai-authenticated-user-email": "ADMIN@example.com" })), false);
+    assert.equal(await isTobiAdminAuthorized(new Headers({ "oai-authenticated-user-id": "user-1" })), false);
+    assert.equal(await isTobiAdminAuthorized(new Headers({ "oai-authenticated-user-id": "user-2", "oai-authenticated-user-email": "customer@example.com" })), false);
     const request = new Request("https://tobi.example/api/config/admin", { method: "PUT", headers: { Origin: "https://tobi.example", "Content-Type": "application/json; charset=utf-8", "Content-Length": "512" }, body: "{}" });
     assert.equal(hasValidMutationOrigin(request), true);
     assert.equal(hasJsonContentType(request), true);

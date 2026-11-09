@@ -181,19 +181,28 @@
     "id": "FEAT-008",
     "name": "Administrace konfigurace",
     "scenario": "Oprávněný správce mění konfiguraci a bezpečně ji uloží.",
-    "behavior": "Interní přístup je fail-closed BLOCKED do implementace schválené serverem ověřené identity/session; raw Sites hlavičky, localhost ani vývojové tokeny neopravňují k přístupu. Validátory API zůstávají zachovány.",
+    "behavior": "Interní přístup ověřuje Supabase Auth getUser a serverový UUID allowlist TOBI_ADMIN_USER_IDS; raw Sites hlavičky, localhost ani vývojové tokeny neopravňují k přístupu. Validátory API zůstávají zachovány.",
     "entryPoints": [
       "/admin",
       "GET/PUT /api/config/admin"
     ],
     "dependencies": [
-      "serverem ověřená session — BLOCKED"
+      "Supabase Email Password — live smoke NOT RUN"
     ],
     "status": "PARTIAL",
     "configRefs": [],
     "sourceRefs": [
-      "app/admin/page.tsx:21",
-      "app/api/config/admin/route.ts:22",
+      "app/admin/page.tsx:16",
+      "app/api/config/admin/route.ts:24",
+      "app/login/page.tsx:1",
+      "app/auth/login/route.ts:1",
+      "app/auth/logout/route.ts:1",
+      "lib/tobi-admin-auth.ts:1",
+      "lib/tobi-supabase.ts:1",
+      "lib/tobi-auth-routes.ts:1",
+      "proxy.ts:1",
+      "scripts/auth.test.mjs:1",
+      "scripts/auth-ssr.test.mjs:1",
       "lib/tobi-config-postgres.ts:1",
       "lib/tobi-config-store.ts:1",
       "supabase/migrations/20261109000000_tobi_configurations.sql:1",
@@ -372,18 +381,21 @@
     "id": "FEAT-016",
     "name": "Interní dokumentační portál",
     "scenario": "Oprávněný správce otevře /doc a dohledá funkci, architekturu nebo regresní případ.",
-    "behavior": "Interní přístup je fail-closed BLOCKED do implementace schválené serverem ověřené identity/session; raw Sites hlavičky, localhost ani vývojové tokeny neopravňují k přístupu. Validátory API zůstávají zachovány.",
+    "behavior": "Interní přístup ověřuje Supabase Auth getUser a serverový UUID allowlist TOBI_ADMIN_USER_IDS; raw Sites hlavičky, localhost ani vývojové tokeny neopravňují k přístupu. Validátory API zůstávají zachovány.",
     "entryPoints": [
       "/doc",
       "npm run docs:validate"
     ],
     "dependencies": [
-      "serverem ověřená session — BLOCKED"
+      "Supabase Email Password — live smoke NOT RUN"
     ],
     "status": "PARTIAL",
     "configRefs": [],
     "sourceRefs": [
       "app/doc/page.tsx:1",
+      "lib/tobi-admin-auth.ts:1",
+      "lib/tobi-supabase.ts:1",
+      "proxy.ts:1",
       "components/tobi-docs/doc-portal.tsx:1",
       "scripts/validate-docs.mjs:1"
     ],

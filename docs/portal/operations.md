@@ -6,7 +6,7 @@
 npm run dev
 ```
 
-Primární cesta používá Next 16.3.4 na portu 3000; `npm run build` je Next webpack build a `npm start` je Next production server. Bez `OPENAI_API_KEY` jsou odpovědi demonstrační; konfigurace vyžaduje PostgreSQL nebo explicitní lokální `TOBI_IN_MEMORY_CONFIG=true` mimo production. Interní admin i dokumentace jsou BLOCKED do serverem ověřené session, i na localhostu.
+Primární cesta používá Next 16.3.4 na portu 3000; `npm run build` je Next webpack build a `npm start` je Next production server. Bez `OPENAI_API_KEY` jsou odpovědi demonstrační; konfigurace vyžaduje PostgreSQL nebo explicitní lokální `TOBI_IN_MEMORY_CONFIG=true` mimo production. Interní admin i dokumentace vyžadují Supabase Auth getUser a serverový UUID allowlist, i na localhostu.
 
 Podrobný provozní postup, offline instalace pg/PGlite a lokální SQL testy, TLS, serverový transaction pooler, oddělené preview/production databáze a ruční SQL migrace jsou v `docs/vercel-supabase.md`. Žádná vzdálená migrace nebyla spuštěna a nejde o nasazený release.
 
@@ -38,7 +38,7 @@ Při změně funkce, kontraktu, konfigurace nebo testu aktualizujte odpovídají
 
 - `OPENAI_API_KEY`: serverové volání OpenAI Responses API.
 - `DATABASE_URL`: serverový PostgreSQL transaction pooler, nikdy NEXT_PUBLIC.
-- Interní autentizace: BLOCKED; původní allowlisty a lokální tokeny přístup neudělují.
+- Interní autentizace: Supabase Email Password, getUser a TOBI_ADMIN_USER_IDS; původní allowlisty a lokální tokeny přístup neudělují.
 - `TOBI_IN_MEMORY_CONFIG`: netrvalý lokální fallback bez DB; v production ignorován.
 - `TOBI_ROUTER_VISION_MODEL`: model pro analýzu fotografie routeru.
 - `TOBI_ROUTER_VISION_FIXTURES_ENABLED`: přesný staging-only testovací fixture; výchozí stav je vypnuto.

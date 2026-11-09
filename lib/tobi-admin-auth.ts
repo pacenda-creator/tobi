@@ -1,15 +1,30 @@
-// BLOCKED: no server-verified identity/session provider has been approved.
-// Unsigned Sites headers, allowlists and development cookies cannot authenticate.
-export function isTobiAdminAuthorized(headers: Headers): boolean {
+import { authClient, authConfiguration } from "./tobi-supabase.ts";
+
+// Only the current Auth server response grants access. Headers and metadata do not.
+export async function isTobiAdminAuthorized(headers?: Headers): Promise<boolean> {
   void headers;
-  return false;
+  const config = authConfiguration();
+  if (!config) return false;
+  try {
+    const { cookies } = await import("next/headers");
+    const jar = await cookies();
+    // Route Handlers can persist a late refresh; Components rely on proxy.
+    // Every private response already carries the SSR cache headers.
+    const client = authClient(() => jar.getAll(), (writes) => {
+      try { writes.forEach(({ name, value, options }) => jar.set(name, value, options)); }
+      catch { /* Server Components cannot write cookies. */ }
+    });
+    if (!client) return false;
+    const { data, error } = await client.auth.getUser();
+    return !error && typeof data.user?.id === "string" && config.ids.has(data.user.id.toLowerCase());
+  } catch { return false; }
 }
 
 export function hasValidMutationOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return false;
   try {
-    return new URL(origin).origin === new URL(request.url).origin;
+    return origin === new URL(request.url).origin;
   } catch {
     return false;
   }

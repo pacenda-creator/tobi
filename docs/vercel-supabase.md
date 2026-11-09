@@ -30,11 +30,25 @@ SQL `supabase/migrations/20261109000000_tobi_configurations.sql` je pouze vytvo�
 
 Config obsahuje neveřejný system prompt: RLS je zapnuté, nejsou veřejné policies a odebrány jsou všechny table grants PUBLIC a existujícím rolím anon/authenticated. SQL je určené pro novou cílovou tabulku bez dříve vytvořených policies. Přístup má pouze důvěryhodný serverový DB owner nebo role s BYPASSRLS a nezbytnými explicitními grants. Browser ani Supabase Data API tento config číst nesmějí. Pro runtime nesmí být použita klientská anon/authenticated role.
 
-## Interní autentizace: BLOCKED
+## Interní autentizace: Supabase Email Password
 
-Nový identity provider zatím nebyl určen. `/admin`, `/doc` a admin config API jsou fail-closed pro všechny identity. Nepodepsané `oai-authenticated-*` hlavičky se nepovažují za ověřenou identitu; `getChatGPTUser` vrací null. Allowlist, localhost, vývojové identity ani lokální token/cookie přístup neodemknou. Neexistuje produkční přepínač pro důvěru Sites hlavičkám. Platformní signin/signout odkazy se nezobrazují.
+Administrace nyní používá Supabase Auth; legacy `app/chatgpt-auth.ts` je nepoužitá fail-closed Sites kompatibilita. Server vždy volá `auth.getUser()` a porovnává pouze ověřené UUID s `TOBI_ADMIN_USER_IDS`. Chybějící či vadná konfigurace a libovolná chyba ověření přístup odmítnou. Email, metadata, Sites hlavičky, localhost ani staré allowlisty práva nedávají.
 
-Odblokování vyžaduje samostatně schválenou a implementovanou serverem ověřenou session/identitu a novou bezpečnostní revizi. CSRF origin, JSON content type, délkové/schema/version validátory zůstávají v admin API pro budoucí ověřenou autentizaci. Veřejný zákaznický chat nepotřebuje interní login; tarify, RAG, prompt a scénáře se touto migrací obsahově nemění.
+Nastavení provádí oprávněný provozovatel až po ověření změn:
+
+1. Ve staging Supabase projektu zapněte Email Password provider. Aplikace nemá signup, invite, vytváření uživatelů, OAuth ani reset hesla. Pokud politika nechce veřejný signup, vypněte jej také v Supabase dashboardu.
+2. Použijte existující Auth Users; jejich UUID vložte do server-only `TOBI_ADMIN_USER_IDS`, oddělená čárkou nebo whitespace. Tato změna žádné vzdálené účty nevytváří.
+3. Do Vercel Preview/staging nastavte správný HTTPS project URL jako `NEXT_PUBLIC_SUPABASE_URL` a nový `sb_publishable_` klíč jako `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Secret/service-role klíče ani legacy JWT aplikace nepřijímá. URL nesmí obsahovat userinfo, query ani fragment. Hodnoty se nelogují.
+4. Supabase Site URL nastavte na přesný schválený HTTPS staging origin. Redirect allowlist omezte na konkrétní staging URL, bez širokých wildcardů; tento password flow používá pouze místní `/admin` a `/doc`, nepotřebuje OAuth callback. Skutečná staging URL není v této změně ověřena.
+5. Zachovejte stávající serverové DB a CA proměnné beze změny a proveďte schválený redeploy Preview/staging. Produkční prostředí tato práce nemění.
+
+`/login` je serverový formulář; POST `/auth/login` a POST `/auth/logout` vyžadují přesně shodný Origin s request URL. Login má limit 8 KiB a obecné chyby bez údajů formuláře. Admin PUT zachovává origin, JSON, limit, schema a version guards. Redirect `next` přijímá jen `/admin` či `/doc`; ostatní hodnoty končí na `/admin`. Nepovolený účet dostane srozumitelné odmítnutí bez automatické redirect smyčky.
+
+Každý request má nový SSR klient. `proxy.ts` obnovuje session jen pro login/auth/admin/doc/admin API, předává refresh do request cookies i do browser response a zachovává druhý argument `setAll` s cache headers i všechny cookie chunky. Každý citlivý handler/page nezávisle ověřuje uživatele před DB/private docs. Všechny tyto cesty jsou private/no-store, Vary Cookie. Cookies mají vlastní jméno `tobi-auth`, root path, SameSite Lax, HttpOnly a Secure v production. Žádný browser klient ani localStorage session není potřeba. Logout volá local signOut a odstraní vlastní chunky i při selhání vzdálené session; cizích cookies se nedotýká.
+
+Ruční live smoke — **NOT RUN**: anonymní `/admin`, `/doc` a admin API odmítnou přístup; přihlášení existujícím povoleným účtem otevře obě stránky i config GET; nepovolený účet je odmítnut; expirovaný access token se obnoví s cookies a no-store headers; logout z `/doc` zneplatní další chráněný request; cross-origin login/logout/PUT selžou. Ověřte produkční Secure/HttpOnly cookies, chunky a bezpečný next. Živé přihlášení ani vzdálený setup nebyly testovány. Lokální `test:auth` používá mocks, nikoli živé účty.
+
+Samostatný lokální produkční HTTPS/browser smoke byl spuštěn proti vlastnímu dočasnému Auth serveru s oficiálním SSR klientem: prošlo přihlášení formulářem, serverové ověření povoleného UUID, odmítnutí nepovoleného UUID i při admin metadatech, odmítnutí neplatné session, CSRF login/logout/PUT, zachování chunkovaných HttpOnly/Secure cookies, private/no-store odpovědi a odhlášení. Expirovaná session se obnovila jednou a nové cookies fungovaly i při dalším requestu. Jde o řízenou lokální fixture, **nikoli o živé Supabase přihlášení**. Ověřování a tokenové požadavky navíc výslovně používají fetch `cache: no-store`.
 
 ## Ověření bez DB
 

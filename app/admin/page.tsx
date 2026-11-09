@@ -15,13 +15,13 @@ export const metadata: Metadata = {
 
 export default async function TobiAdminPage() {
   const requestHeaders = await headers();
-  if (isTobiAdminAuthorized(requestHeaders)) return <TobiStudio />;
+  if (await isTobiAdminAuthorized(requestHeaders)) return <><form action="/auth/logout" method="post"><button>Odhlásit se</button></form><TobiStudio /></>;
 
   return (
     <InternalAccessCard
       title="Administrace TOBi — přístup uzamčen"
-      description="BLOCKED: Interní přístup čeká na implementaci serverem ověřené identity a session."
-      primaryAction={null}
+      description="Přístup vyžaduje přihlášení povoleného správce."
+      primaryAction={<a href="/login?next=/admin">Přihlásit se</a>}
     />
   );
 }

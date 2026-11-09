@@ -21,7 +21,7 @@ Aktivní konfigurace je jeden verzovaný JSONB záznam v PostgreSQL přes lazy N
 
 ## Hranice důvěry
 
-Klient nemá přístup k API klíči. Administrace a tato dokumentace jsou fail-closed BLOCKED do implementace serverem ověřené identity/session. Nepodepsané Sites hlavičky ani vývojové identity neopravňují k přístupu. Raw výstup modelu ani Markdown se nevykonává jako HTML nebo JavaScript.
+Klient nemá přístup k API klíči. Administrace a tato dokumentace používají Supabase Auth getUser a serverový UUID allowlist; bez platné konfigurace jsou fail-closed. Nepodepsané Sites hlavičky ani vývojové identity neopravňují k přístupu. Raw výstup modelu ani Markdown se nevykonává jako HTML nebo JavaScript.
 
 ## Chyby a fallback
 

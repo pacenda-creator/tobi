@@ -31,11 +31,11 @@ test("dokumentační zdroje mají platné vazby, evidenci a nejméně 20 regres�
 
 test("route /doc zachová fail-closed autorizaci a načítá obsah až po ní", () => {
   const route = readFileSync(new URL("../app/doc/page.tsx", import.meta.url), "utf8");
-  const authorization = route.indexOf("isTobiAdminAuthorized(requestHeaders)");
+  const authorization = route.indexOf("await isTobiAdminAuthorized(requestHeaders)");
   const contentImport = route.indexOf("await import(\"@/lib/tobi-docs/server-content\")");
   assert.ok(authorization >= 0);
   assert.ok(contentImport > authorization);
-  assert.match(route, /if \(isTobiAdminAuthorized\(requestHeaders\)\) \{/);
+  assert.match(route, /if \(await isTobiAdminAuthorized\(requestHeaders\)\) \{/);
   assert.doesNotMatch(route, /localPreview|localhost|127\.0\.0\.1/);
   assert.match(route, /index:\s*false/);
   assert.match(route, /follow:\s*false/);
