@@ -1,0 +1,16 @@
+# Supabase
+.branches
+.temp
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local
+
+# Environment files and private keys must stay local.
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
