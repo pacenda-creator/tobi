@@ -74,7 +74,8 @@
     "id": "FEAT-004",
     "name": "Přednastavené telco znalosti",
     "scenario": "Dotaz na PUK, pevný internet, roaming nebo platby odpovídá lokální kartě; Vodafone TV pokračuje obecnou retrieval cestou.",
-    "behavior": "Kurátorované odpovědi poskytují kroky, bezpečné akce a ověřený veřejný zdroj jen pro skutečně katalogové oblasti.",
+    "behavior": "Kurátorované odpovědi poskytují kroky, bezpečné akce a ověřený veřejný zdroj jen pro skutečně katalogové oblasti. Billing CTA má popisek Otevřít Můj Vodafone v nové kartě a zachovává openUrl na https://muj.vodafone.cz/; neslibuje přímé otevření konkrétního vyúčtování. Renderer, handlery, styly, odpověď, quick replies a ostatní CTA včetně eSIM se nemění.",
+    "evidenceNotes": "Připravená copy změna je pouze dílčí opravou P2 z UX auditu, nikoli uzavřením celé položky ani důkazem nasazení. Nová regrese ověřuje kontrakt akce; browserová sada pokrývá desktop, 320 px, CSS layout zoom 200 % (nikoli nativní browser zoom) a kontrolní eSIM. Hostitelský pokus 2026-11-12 skončil při všech čtyřech browser launchích chybou Chromium sandboxing failed se zapnutým chromiumSandbox; UI aserce jsou BLOCKED / NEPROVEDENO, nikoli PASS ani čtyři funkční defekty. Úspěšné výsledky vyžadují samostatnou evidenci běhu a finální release SHA.",
     "entryPoints": [
       "lib/vodafone-knowledge.ts"
     ],
@@ -93,7 +94,10 @@
     ],
     "testCaseIds": [
       "REG-004",
-      "REG-006"
+      "REG-006",
+      "REG-052",
+      "REG-053",
+      "REG-054"
     ]
   },
   {

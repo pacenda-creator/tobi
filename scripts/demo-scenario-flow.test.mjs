@@ -7,6 +7,28 @@ import {
   instantiateDemoResponse,
 } from "../lib/demo-scenario-catalog.ts";
 
+test("billing CTA výslovně otevírá Můj Vodafone v nové kartě a zachovává ostatní akce", () => {
+  const billing = findExplicitDemoScenario("vyúčtování");
+  assert.ok(billing);
+  const response = instantiateDemoResponse(billing);
+  assert.deepEqual(response.blocks.find((block) => block.type === "action"), {
+    type: "action",
+    id: "answer-action",
+    label: "Otevřít Můj Vodafone v nové kartě",
+    action: { kind: "openUrl", url: "https://muj.vodafone.cz/", external: true },
+  });
+  assert.equal(response.text, "Vyúčtování zobrazíte a zaplatíte v Můj Vodafone nebo v aplikaci Můj Vodafone+.");
+  assert.deepEqual(response.quickReplies.map((reply) => reply.label), ["Najít vyúčtování", "Platba se nepropsala", "Vysvětlit částku"]);
+  const esim = findExplicitDemoScenario("esim");
+  assert.ok(esim);
+  assert.deepEqual(instantiateDemoResponse(esim).blocks.find((block) => block.type === "action"), {
+    type: "action",
+    id: "answer-action",
+    label: "Otevřít Můj Vodafone",
+    action: { kind: "openUrl", url: "https://muj.vodafone.cz/", external: true },
+  });
+});
+
 test("internetové flow projde od prvního dotazu přes restart až po vyřešení", () => {
   const initialMatch = findExplicitDemoScenario("Nefunguje mi internet doma.");
   assert.ok(initialMatch);

@@ -1119,5 +1119,84 @@
       "testName": "production missing DATABASE_URL rejects even with memory flag, without exposing values",
       "command": "npm run test:migration"
     }
+  },
+  {
+    "id": "REG-052",
+    "title": "Billing CTA copy a nezměněný kontrakt akcí",
+    "category": "Scénáře",
+    "priority": "P2",
+    "preconditions": [],
+    "steps": [
+      "Vytvoř skutečnou demo odpověď pro vyúčtování a kontrolní eSIM."
+    ],
+    "expected": [
+      "Billing akce má popisek Otevřít Můj Vodafone v nové kartě, kind openUrl, URL https://muj.vodafone.cz/ a external true.",
+      "Původní text odpovědi, quick replies i eSIM akce zůstávají beze změny."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/vodafone-knowledge.ts:126",
+      "lib/demo-scenario-catalog.ts:1"
+    ],
+    "automation": {
+      "file": "scripts/demo-scenario-flow.test.mjs",
+      "testName": "billing CTA výslovně otevírá Můj Vodafone v nové kartě a zachovává ostatní akce",
+      "command": "npm run test:chat-contract"
+    }
+  },
+  {
+    "id": "REG-053",
+    "title": "Billing CTA v prohlížeči: dostupnost a externí nová karta",
+    "category": "UI",
+    "priority": "P2",
+    "preconditions": [
+      "Lokální /chat a /api/chat/v1 běží se skutečnou aplikací a in-memory konfigurací; Chromium sandbox zůstává zapnutý.",
+      "Veškeré požadavky mimo lokální testovací aplikaci se preventivně blokují; pouze očekávaná externí navigace nové karty se zaznamená jako cíl CTA. Na zákaznický účet se požadavek neodešle."
+    ],
+    "steps": [
+      "Odešli vyúčtování na desktopu, při šířce 320 px a při CSS layout zoom 200 %.",
+      "Ověř popisek, přístupný název a čitelnost bez horizontálního overflow; z výchozího composeru dojdi na CTA Tabem, zaznamenej focus a aktivuj odkaz Enterem. Viditelný focus indikátor vyžaduje prohlídku skutečného renderu."
+    ],
+    "expected": [
+      "CTA má přesný popisek Otevřít Můj Vodafone v nové kartě, href https://muj.vodafone.cz/, target _blank a rel noreferrer.",
+      "Enter otevře samostatnou kartu s očekávanou navigací; původní /chat, zprávy a počet zápisových požadavků se nezmění.",
+      "Test nedokládá nativní browser zoom ani obsah či přihlášení zákaznického účtu."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/vodafone-knowledge.ts:126",
+      "components/tobi/chat-block-renderer.tsx:1",
+      "e2e/billing-cta.spec.ts:63"
+    ],
+    "automation": {
+      "file": "e2e/billing-cta.spec.ts",
+      "testName": "billing CTA:",
+      "command": "npx --no-install playwright test e2e/billing-cta.spec.ts"
+    }
+  },
+  {
+    "id": "REG-054",
+    "title": "Kontrolní eSIM CTA v prohlížeči",
+    "category": "UI",
+    "priority": "P2",
+    "preconditions": [
+      "Lokální /chat běží s in-memory konfigurací a blokovanými externími požadavky."
+    ],
+    "steps": [
+      "Odešli esim přes skutečný /chat."
+    ],
+    "expected": [
+      "eSIM zachová popisek Otevřít Můj Vodafone, href https://muj.vodafone.cz/, target _blank a rel noreferrer; nový billing popisek se nezobrazí."
+    ],
+    "mode": "AUTOMATED",
+    "implementationRefs": [
+      "lib/vodafone-knowledge.ts:1",
+      "e2e/billing-cta.spec.ts:136"
+    ],
+    "automation": {
+      "file": "e2e/billing-cta.spec.ts",
+      "testName": "eSIM CTA zůstává beze změny na skutečném /chat",
+      "command": "npx --no-install playwright test e2e/billing-cta.spec.ts"
+    }
   }
 ]

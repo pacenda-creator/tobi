@@ -123,7 +123,7 @@ export const vodafoneKnowledge: KnowledgeCard[] = [
     sourceTitle: "Vodafone Centrum péče · Úhrada vyúčtování",
     sourceUrl: "https://www.vodafone.cz/pece/vyuctovani-platby-kredit/platba-vyuctovani/jak-uhradit-vyuctovani/",
     quickReplies: ["Najít vyúčtování", "Platba se nepropsala", "Vysvětlit částku"],
-    actionLabel: "Přejít na vyúčtování",
+    actionLabel: "Otevřít Můj Vodafone v nové kartě",
     actionUrl: "https://muj.vodafone.cz/",
   },
   {
