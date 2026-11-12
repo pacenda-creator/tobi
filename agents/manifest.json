@@ -1,0 +1,69 @@
+{
+  "source_archive": "tobi-agent-definitions.zip",
+  "source_archive_sha256": "229e4352304f9a8ee3110775ad9797a141a44a062cad1dc078d0b530a65f3661",
+  "roles": {
+    "tobi_ux": {
+      "source": "agents/originals/.codex/agents/tobi-ux.toml",
+      "instructions": "agents/roles/tobi_ux.md",
+      "dependencies": [
+        "agents/originals/.agents/skills/tobi-chatbot-ux/SKILL.md",
+        "agents/originals/.agents/skills/tobi-chatbot-ux/references/project-context.md",
+        "agents/originals/.agents/skills/tobi-chatbot-ux/references/research.md"
+      ],
+      "codex_settings": {
+        "model": "gpt-6-astra",
+        "model_reasoning_effort": "high"
+      }
+    },
+    "tobi_architect": {
+      "source": "agents/originals/.codex/agents/tobi_architect.toml",
+      "instructions": "agents/roles/tobi_architect.md",
+      "dependencies": [],
+      "codex_settings": {
+        "model_reasoning_effort": "high"
+      }
+    },
+    "tobi_developer": {
+      "source": "agents/originals/.codex/agents/tobi_developer.toml",
+      "instructions": "agents/roles/tobi_developer.md",
+      "dependencies": [],
+      "codex_settings": {
+        "model_reasoning_effort": "high"
+      }
+    },
+    "tobi_qa": {
+      "source": "agents/originals/.codex/agents/tobi_qa.toml",
+      "instructions": "agents/roles/tobi_qa.md",
+      "dependencies": [],
+      "codex_settings": {
+        "model_reasoning_effort": "high"
+      }
+    },
+    "tobi_documentation": {
+      "source": "agents/originals/.codex/agents/tobi_documentation.toml",
+      "instructions": "agents/roles/tobi_documentation.md",
+      "dependencies": [],
+      "codex_settings": {
+        "model_reasoning_effort": "high"
+      }
+    }
+  },
+  "sha256": {
+    "agents/README.md": "e6fe9699946f2132a438ef02be2c04f970e31376c8360eea471db5c217ab0ef9",
+    "agents/originals/.agents/skills/tobi-chatbot-ux/SKILL.md": "a48f5aa10e398cc4a2643fb08508d5bd09055452df154b75fdf064464ea4da6f",
+    "agents/originals/.agents/skills/tobi-chatbot-ux/references/project-context.md": "79ccf78cc15a5bfb8e684946453bd6841e5b63c8f007f9bd67a98d820f1ad78b",
+    "agents/originals/.agents/skills/tobi-chatbot-ux/references/research.md": "b43dd8e259bced57b0297b14b8a9e752320d2a5ab2440b499510df77cbe3347e",
+    "agents/originals/.codex/agents/tobi-ux.toml": "1d396ceff61e1a5a0a32c81fe9eb29185e8699c11c479ecb2014ddb7e629e654",
+    "agents/originals/.codex/agents/tobi_architect.toml": "c29a630b0f97b31c8a097f7cdbb5830a92448699a3a410b089be3cb609cf7b4f",
+    "agents/originals/.codex/agents/tobi_developer.toml": "4452e89c5262f22957da55dce37c2ae0f6726e5dcd04188c9388ac966bd97d67",
+    "agents/originals/.codex/agents/tobi_documentation.toml": "3a54a98e78bd0538f154db8664379ac32c02949ade2db430d676d6b866948cd8",
+    "agents/originals/.codex/agents/tobi_qa.toml": "dcecaf4bf9fdcb85b7c036c7224db4c5c673f10837d2346664fc42da70ba9b51",
+    "agents/originals/AGENTS.md": "f5dd3b14bda112172b703d284c44a29f1ceeb5e8ff9a03cc9d936d4edd53dfba",
+    "agents/roles/tobi_architect.md": "16b66811630ba180143b6cb5b57264638bee507c309f1e26f8501f9ad2c4cf5d",
+    "agents/roles/tobi_developer.md": "d04dbb872dc0b2bb8a6fc929e53077dde1931a0ed279062f8f61466885f2d5be",
+    "agents/roles/tobi_documentation.md": "615f0a323a4b1341e09816d3bfe5aa81b20ba98ec6feb10b61df9906f3235d07",
+    "agents/roles/tobi_qa.md": "2181bc9aac070779b11f37851f2f464bf1bfae124b9616764646c2446eebb775",
+    "agents/roles/tobi_ux.md": "7d1e75fd8bf1b354fc657eeb0cababcae0239da10cf6b7b3fd2cf492e74c5c8a",
+    "agents/workflow.md": "460bd3f7bf2bc8886b9ed2504fb627e318b03f90b7d3547e26bab512b9acb889"
+  }
+}
